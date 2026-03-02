@@ -1,26 +1,185 @@
+@import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:ital,wght@0,100..800;1,100..800&display=swap');
 @import "tailwindcss";
 
+@theme {
+  --font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, monospace;
+  --color-bg-base: var(--theme-bg-base);
+  --color-bg-card: var(--theme-bg-card);
+  --color-border: var(--theme-border);
+  --color-text-primary: var(--theme-text-primary);
+  --color-text-muted: var(--theme-text-muted);
+  --color-accent: var(--theme-accent);
+  --color-accent-hover: var(--theme-accent-hover);
+  --color-success: var(--theme-success);
+}
+
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  --theme-bg-base: #FFFDF9;
+  --theme-bg-card: #FFFFFF;
+  --theme-border: #E2DCD0;
+  --theme-text-primary: #2C2825;
+  --theme-text-muted: #8C857B;
+  --theme-accent: #FF6B35;
+  --theme-accent-hover: #E55A2B;
+  --theme-success: #10B981;
 }
 
-@theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
-}
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+.dark {
+  --theme-bg-base: #1C1917;
+  --theme-bg-card: #292524;
+  --theme-border: #44403C;
+  --theme-text-primary: #F5F5F4;
+  --theme-text-muted: #A8A29E;
+  --theme-accent: #FF6B35;
+  --theme-accent-hover: #E55A2B;
+  --theme-success: #10B981;
 }
 
 body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  font-family: var(--font-mono);
+  background-color: var(--color-bg-base);
+  color: var(--color-text-primary);
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Custom scrollbar */
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+::-webkit-scrollbar-track {
+  background: var(--color-bg-base);
+  border-left: 2px solid var(--color-border);
+}
+::-webkit-scrollbar-thumb {
+  background: var(--color-border);
+}
+::-webkit-scrollbar-thumb:hover {
+  background: var(--color-accent);
+}
+
+/* Line clamp utility */
+.line-clamp-3 {
+    display: -webkit-box;
+    -webkit-line-clamp: 3;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+}
+
+/* Prose styles for markdown */
+.prose {
+    color: #e8e6e3;
+    max-width: none;
+}
+
+.prose h1,
+.prose h2,
+.prose h3,
+.prose h4,
+.prose h5,
+.prose h6 {
+    color: #e8e6e3;
+    font-weight: 600;
+    margin-top: 1.5rem;
+    margin-bottom: 0.75rem;
+}
+
+.prose h1 {
+    font-size: 1.875rem;
+    line-height: 2.25rem;
+}
+.prose h2 {
+    font-size: 1.5rem;
+    line-height: 2rem;
+}
+.prose h3 {
+    font-size: 1.25rem;
+    line-height: 1.75rem;
+}
+.prose h4 {
+    font-size: 1.125rem;
+    line-height: 1.75rem;
+}
+
+.prose p {
+    margin-top: 1rem;
+    margin-bottom: 1rem;
+    color: #8a8694;
+    line-height: 1.7;
+}
+
+.prose a {
+    color: #e8a84c;
+    text-decoration: underline;
+}
+
+.prose a:hover {
+    color: #e8a84c;
+    opacity: 0.8;
+}
+
+.prose code {
+    background-color: #13131b;
+    color: #e8a84c;
+    padding: 0.125rem 0.25rem;
+    border-radius: 0.25rem;
+    font-size: 0.875rem;
+}
+
+.prose pre {
+    background-color: #0c0c12;
+    border: 1px solid #1e1e2a;
+    border-radius: 0.5rem;
+    padding: 1rem;
+    overflow-x: auto;
+    margin: 1rem 0;
+}
+
+.prose pre code {
+    background-color: transparent;
+    color: #e8e6e3;
+    padding: 0;
+    border-radius: 0;
+}
+
+.prose ul,
+.prose ol {
+    margin: 1rem 0;
+    padding-left: 1.5rem;
+    color: #8a8694;
+}
+
+.prose li {
+    margin: 0.5rem 0;
+}
+
+.prose blockquote {
+    border-left: 4px solid #e8a84c;
+    padding-left: 1rem;
+    margin: 1rem 0;
+    font-style: italic;
+    color: #8a8694;
+}
+
+.prose table {
+    width: 100%;
+    border-collapse: collapse;
+    margin: 1rem 0;
+}
+
+.prose th,
+.prose td {
+    border: 1px solid #1e1e2a;
+    padding: 0.5rem;
+    text-align: left;
+}
+
+.prose th {
+    background-color: #13131b;
+    color: #e8e6e3;
+    font-weight: 600;
+}
+
+.prose td {
+    color: #8a8694;
 }

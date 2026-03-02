@@ -1,0 +1,168 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+// Better Auth tables
+model User {
+  id            String    @id @default(cuid())
+  email         String    @unique
+  emailVerified Boolean   @default(false)
+  name          String?
+  image         String?
+  githubId      String?   @unique
+  githubUsername String?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+  
+  sessions      Session[]
+  accounts      Account[]
+  votes         Vote[]
+  submissions   Submission[]
+
+  @@map("user")
+}
+
+model Session {
+  id        String   @id @default(cuid())
+  userId    String
+  expiresAt DateTime
+  token     String   @unique
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  ipAddress String?
+  userAgent String?
+  
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("session")
+}
+
+model Account {
+  id                String  @id @default(cuid())
+  userId            String
+  accountId         String
+  providerId        String
+  accessToken       String?
+  refreshToken      String?
+  idToken           String?
+  accessTokenExpiresAt DateTime?
+  refreshTokenExpiresAt DateTime?
+  scope             String?
+  password          String?
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+  
+  user              User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([providerId, accountId])
+  @@map("account")
+}
+
+model Verification {
+  id         String   @id @default(cuid())
+  identifier String
+  value      String
+  expiresAt  DateTime
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  @@unique([identifier, value])
+  @@map("verification")
+}
+
+// Application tables
+enum ListingType {
+  skill
+  mcp
+  tool
+}
+
+enum SubmissionStatus {
+  pending
+  approved
+  rejected
+}
+
+model Listing {
+  id                String      @id @default(cuid())
+  slug              String      @unique
+  name              String
+  type              ListingType
+  description       String
+  longDescription   String?
+  authorHandle      String
+  repoUrl           String
+  repoPath          String?
+  category          String
+  tags              String[]
+  compatibleAgents  String[]    @default([])
+  triggerWords      String[]    @default([])
+  isOpenSource      Boolean     @default(true)
+  license           String      @default("MIT")
+  documentation     String?
+  overview          String?
+  isOfficial        Boolean     @default(false)
+  isSafe            Boolean     @default(false)
+  healthScore       Int         @default(0)
+  githubStars       Int         @default(0)
+  weeklyInstalls    Int         @default(0)
+  totalInstalls     Int         @default(0)
+  voteCount         Int         @default(0)
+  files             Json        @default("[]")
+  agentsInstalledOn Json        @default("{}")
+  firstSeenAt       DateTime    @default(now())
+  createdAt         DateTime    @default(now())
+  updatedAt         DateTime    @updatedAt
+  
+  votes             Vote[]
+
+  @@map("listings")
+}
+
+model Vote {
+  id        String   @id @default(cuid())
+  listingId String
+  userId    String
+  value     Int      // +1 or -1
+  createdAt DateTime @default(now())
+  
+  listing   Listing  @relation(fields: [listingId], references: [id], onDelete: Cascade)
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([listingId, userId])
+  @@map("votes")
+}
+
+model Submission {
+  id               String           @id @default(cuid())
+  userId           String
+  name             String
+  description      String
+  longDescription  String
+  type             ListingType
+  category         String
+  repoUrl          String
+  repoPath         String?
+  tags             String[]         @default([])
+  authorHandle     String
+  compatibleAgents String[]         @default([])
+  triggerWords     String[]         @default([])
+  isOpenSource     Boolean          @default(true)
+  license          String           @default("MIT")
+  documentation    String?
+  overview         String?
+  notes            String?
+  status           SubmissionStatus @default(pending)
+  createdAt        DateTime         @default(now())
+  
+  user             User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("submissions")
+}
