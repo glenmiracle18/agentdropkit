@@ -5,6 +5,7 @@ import { useSession, signOut } from "@/lib/auth-client";
 import Image from "next/image";
 import { useTheme } from "next-themes";
 import { useEffect, useState } from "react";
+import AgentDropkitLogo from "@/public/assets/logo";
 
 export default function Navigation() {
   const { data: session, isPending } = useSession();
@@ -32,115 +33,7 @@ export default function Navigation() {
           {/* Logo */}
           <Link href="/" className="flex items-center group" onClick={() => setIsMobileMenuOpen(false)}>
             <div className="bg-accent flex items-center gap-2 px-3 py-1.5 sm:px-4 sm:py-2 hover:bg-accent-hover transition-colors">
-              {mounted && resolvedTheme === "light" ? (
-                <svg width="30px" height="30px" viewBox="0 0 30 30" xmlns="http://www.w3.org/2000/svg">
-                  <g fill="none" className="nc-icon-wrapper" strokeLinejoin="miter" strokeLinecap="butt">
-                    <path d="M3 7H3.01" stroke="#1c1f21" strokeWidth="4" strokeLinecap="square"></path>
-                    <path d="M3 11H3.01" stroke="#1c1f2100" strokeWidth="4" strokeLinecap="square"></path>
-                    <path d="M3 15H3.01" stroke="#1c1f2100" strokeWidth="4" strokeLinecap="square"></path>
-                    <path d="M3 19H3.01" stroke="#1c1f2100" strokeWidth="4" strokeLinecap="square"></path>
-                    <path d="M3 23H3.01" stroke="#1c1f21" strokeWidth="4" strokeLinecap="square"></path>
-                    <path d="M3 27H3.01" stroke="#1c1f2100" strokeWidth="4" strokeLinecap="square"></path>
-                    <path d="M7 7H7.01" stroke="#1c1f21" strokeWidth="4" strokeLinecap="square"></path>
-                    <path d="M7 11H7.01" stroke="#1c1f21" strokeWidth="4" strokeLinecap="square"></path>
-                    <path d="M7 15H7.01" stroke="#1c1f21" strokeWidth="4" strokeLinecap="square"></path>
-                    <path d="M7 19H7.01" stroke="#1c1f21" strokeWidth="4" strokeLinecap="square"></path>
-                    <path d="M7 23H7.01" stroke="#1c1f21" strokeWidth="4" strokeLinecap="square"></path>
-                    <path d="M7 27H7.01" stroke="#1c1f21" strokeWidth="4" strokeLinecap="square"></path>
-                    <path d="M11 7H11.01" stroke="#1c1f21" strokeWidth="4" strokeLinecap="square"></path>
-                    <path d="M11 11H11.01" stroke="#1c1f2100" strokeWidth="4" strokeLinecap="square"></path>
-                    <path d="M11 15H11.01" stroke="#1c1f2140" strokeWidth="4" strokeLinecap="square"></path>
-                    <path d="M11 19H11.01" stroke="#1c1f2140" strokeWidth="4" strokeLinecap="square"></path>
-                    <path d="M11 23H11.01" stroke="#1c1f21" strokeWidth="4" strokeLinecap="square"></path>
-                    <path d="M10.99 27H11" stroke="#1c1f2100" strokeWidth="4" strokeLinecap="square"></path>
-                    <path d="M15 7H15.01" stroke="#1c1f21" strokeWidth="4" strokeLinecap="square"></path>
-                    <path d="M15 11H15.01" stroke="#1c1f2100" strokeWidth="4" strokeLinecap="square"></path>
-                    <path d="M15 15H15.01" stroke="#1c1f2100" strokeWidth="4" strokeLinecap="square"></path>
-                    <path d="M15 19H15.01" stroke="#1c1f2140" strokeWidth="4" strokeLinecap="square"></path>
-                    <path d="M15 23H15.01" stroke="#1c1f21" strokeWidth="4" strokeLinecap="square"></path>
-                    <path d="M15 27H15.01" stroke="#1c1f2100" strokeWidth="4" strokeLinecap="square"></path>
-                    <path d="M19 7H19.01" stroke="#1c1f21" strokeWidth="4" strokeLinecap="square"></path>
-                    <path d="M19 11H19.01" stroke="#1c1f2100" strokeWidth="4" strokeLinecap="square"></path>
-                    <path d="M19 15H19.01" stroke="#1c1f2100" strokeWidth="4" strokeLinecap="square"></path>
-                    <path d="M19 19H19.01" stroke="#1c1f2100" strokeWidth="4" strokeLinecap="square"></path>
-                    <path d="M19 23H19.01" stroke="#1c1f21" strokeWidth="4" strokeLinecap="square"></path>
-                    <path d="M19 27H19.01" stroke="#1c1f2100" strokeWidth="4" strokeLinecap="square"></path>
-                    <path d="M23 7H23.01" stroke="#1c1f21" strokeWidth="4" strokeLinecap="square"></path>
-                    <path d="M23 11H23.01" stroke="#1c1f21" strokeWidth="4" strokeLinecap="square"></path>
-                    <path d="M7 3H7.01" stroke="#1c1f21" strokeWidth="4" strokeLinecap="square"></path>
-                    <path d="M3 3H3.01" stroke="#1c1f2100" strokeWidth="4" strokeLinecap="square"></path>
-                    <path d="M11 3H11.01" stroke="#1c1f2100" strokeWidth="4" strokeLinecap="square"></path>
-                    <path d="M15 3H15.01" stroke="#1c1f2100" strokeWidth="4" strokeLinecap="square"></path>
-                    <path d="M19 3H19.01" stroke="#1c1f2100" strokeWidth="4" strokeLinecap="square"></path>
-                    <path d="M23 3H23.01" stroke="#1c1f21" strokeWidth="4" strokeLinecap="square"></path>
-                    <path d="M27 3H27.01" stroke="#1c1f2100" strokeWidth="4" strokeLinecap="square"></path>
-                    <path d="M23 15H23.01" stroke="#1c1f21" strokeWidth="4" strokeLinecap="square"></path>
-                    <path d="M23 19H23.01" stroke="#1c1f21" strokeWidth="4" strokeLinecap="square"></path>
-                    <path d="M23 23H23.01" stroke="#1c1f21" strokeWidth="4" strokeLinecap="square"></path>
-                    <path d="M27 27H27.01" stroke="#1c1f2100" strokeWidth="4" strokeLinecap="square"></path>
-                    <path d="M23 27H23.01" stroke="#1c1f21" strokeWidth="4" strokeLinecap="square"></path>
-                    <path d="M27 7H27.01" stroke="#1c1f21" strokeWidth="4" strokeLinecap="square"></path>
-                    <path d="M27 11H27.01" stroke="#1c1f2100" strokeWidth="4" strokeLinecap="square"></path>
-                    <path d="M27 15H27.01" stroke="#1c1f2100" strokeWidth="4" strokeLinecap="square"></path>
-                    <path d="M27 19H27.01" stroke="#1c1f2100" strokeWidth="4" strokeLinecap="square"></path>
-                    <path d="M27 23H27.01" stroke="#1c1f21" strokeWidth="4" strokeLinecap="square"></path>
-                  </g>
-                </svg>
-              ) : (
-                <svg width="30px" height="30px" viewBox="0 0 30 30" xmlns="http://www.w3.org/2000/svg">
-                  <g fill="none" className="nc-icon-wrapper" strokeLinejoin="miter" strokeLinecap="butt">
-                    <path d="M3 7H3.01" stroke="#f7f8f8" strokeWidth="4" strokeLinecap="square"></path>
-                    <path d="M3 11H3.01" stroke="#f7f8f800" strokeWidth="4" strokeLinecap="square"></path>
-                    <path d="M3 15H3.01" stroke="#f7f8f800" strokeWidth="4" strokeLinecap="square"></path>
-                    <path d="M3 19H3.01" stroke="#f7f8f800" strokeWidth="4" strokeLinecap="square"></path>
-                    <path d="M3 23H3.01" stroke="#f7f8f8" strokeWidth="4" strokeLinecap="square"></path>
-                    <path d="M3 27H3.01" stroke="#f7f8f800" strokeWidth="4" strokeLinecap="square"></path>
-                    <path d="M7 7H7.01" stroke="#f7f8f8" strokeWidth="4" strokeLinecap="square"></path>
-                    <path d="M7 11H7.01" stroke="#f7f8f8" strokeWidth="4" strokeLinecap="square"></path>
-                    <path d="M7 15H7.01" stroke="#f7f8f8" strokeWidth="4" strokeLinecap="square"></path>
-                    <path d="M7 19H7.01" stroke="#f7f8f8" strokeWidth="4" strokeLinecap="square"></path>
-                    <path d="M7 23H7.01" stroke="#f7f8f8" strokeWidth="4" strokeLinecap="square"></path>
-                    <path d="M7 27H7.01" stroke="#f7f8f8" strokeWidth="4" strokeLinecap="square"></path>
-                    <path d="M11 7H11.01" stroke="#f7f8f8" strokeWidth="4" strokeLinecap="square"></path>
-                    <path d="M11 11H11.01" stroke="#f7f8f800" strokeWidth="4" strokeLinecap="square"></path>
-                    <path d="M11 15H11.01" stroke="#f7f8f840" strokeWidth="4" strokeLinecap="square"></path>
-                    <path d="M11 19H11.01" stroke="#f7f8f840" strokeWidth="4" strokeLinecap="square"></path>
-                    <path d="M11 23H11.01" stroke="#f7f8f8" strokeWidth="4" strokeLinecap="square"></path>
-                    <path d="M10.99 27H11" stroke="#f7f8f800" strokeWidth="4" strokeLinecap="square"></path>
-                    <path d="M15 7H15.01" stroke="#f7f8f8" strokeWidth="4" strokeLinecap="square"></path>
-                    <path d="M15 11H15.01" stroke="#f7f8f800" strokeWidth="4" strokeLinecap="square"></path>
-                    <path d="M15 15H15.01" stroke="#f7f8f800" strokeWidth="4" strokeLinecap="square"></path>
-                    <path d="M15 19H15.01" stroke="#f7f8f840" strokeWidth="4" strokeLinecap="square"></path>
-                    <path d="M15 23H15.01" stroke="#f7f8f8" strokeWidth="4" strokeLinecap="square"></path>
-                    <path d="M15 27H15.01" stroke="#f7f8f800" strokeWidth="4" strokeLinecap="square"></path>
-                    <path d="M19 7H19.01" stroke="#f7f8f8" strokeWidth="4" strokeLinecap="square"></path>
-                    <path d="M19 11H19.01" stroke="#f7f8f800" strokeWidth="4" strokeLinecap="square"></path>
-                    <path d="M19 15H19.01" stroke="#f7f8f800" strokeWidth="4" strokeLinecap="square"></path>
-                    <path d="M19 19H19.01" stroke="#f7f8f800" strokeWidth="4" strokeLinecap="square"></path>
-                    <path d="M19 23H19.01" stroke="#f7f8f8" strokeWidth="4" strokeLinecap="square"></path>
-                    <path d="M19 27H19.01" stroke="#f7f8f800" strokeWidth="4" strokeLinecap="square"></path>
-                    <path d="M23 7H23.01" stroke="#f7f8f8" strokeWidth="4" strokeLinecap="square"></path>
-                    <path d="M23 11H23.01" stroke="#f7f8f8" strokeWidth="4" strokeLinecap="square"></path>
-                    <path d="M7 3H7.01" stroke="#f7f8f8" strokeWidth="4" strokeLinecap="square"></path>
-                    <path d="M3 3H3.01" stroke="#f7f8f800" strokeWidth="4" strokeLinecap="square"></path>
-                    <path d="M11 3H11.01" stroke="#f7f8f800" strokeWidth="4" strokeLinecap="square"></path>
-                    <path d="M15 3H15.01" stroke="#f7f8f800" strokeWidth="4" strokeLinecap="square"></path>
-                    <path d="M19 3H19.01" stroke="#f7f8f800" strokeWidth="4" strokeLinecap="square"></path>
-                    <path d="M23 3H23.01" stroke="#f7f8f8" strokeWidth="4" strokeLinecap="square"></path>
-                    <path d="M27 3H27.01" stroke="#f7f8f800" strokeWidth="4" strokeLinecap="square"></path>
-                    <path d="M23 15H23.01" stroke="#f7f8f8" strokeWidth="4" strokeLinecap="square"></path>
-                    <path d="M23 19H23.01" stroke="#f7f8f8" strokeWidth="4" strokeLinecap="square"></path>
-                    <path d="M23 23H23.01" stroke="#f7f8f8" strokeWidth="4" strokeLinecap="square"></path>
-                    <path d="M27 27H27.01" stroke="#f7f8f800" strokeWidth="4" strokeLinecap="square"></path>
-                    <path d="M23 27H23.01" stroke="#f7f8f8" strokeWidth="4" strokeLinecap="square"></path>
-                    <path d="M27 7H27.01" stroke="#f7f8f8" strokeWidth="4" strokeLinecap="square"></path>
-                    <path d="M27 11H27.01" stroke="#f7f8f800" strokeWidth="4" strokeLinecap="square"></path>
-                    <path d="M27 15H27.01" stroke="#f7f8f800" strokeWidth="4" strokeLinecap="square"></path>
-                    <path d="M27 19H27.01" stroke="#f7f8f800" strokeWidth="4" strokeLinecap="square"></path>
-                    <path d="M27 23H27.01" stroke="#f7f8f8" strokeWidth="4" strokeLinecap="square"></path>
-                  </g>
-                </svg>
-              )}
+              <AgentDropkitLogo size="30px" />
               <span className="text-bg-base font-bold text-lg sm:text-xl tracking-tight uppercase">
                 AgentDropkit
               </span>
@@ -156,16 +49,10 @@ export default function Navigation() {
               Directory
             </Link>
             <Link
-              href="/mcp"
+              href="/docs"
               className="text-text-muted hover:text-text-primary transition-colors font-bold"
             >
-              MCP
-            </Link>
-            <Link
-              href="/tools"
-              className="text-text-muted hover:text-text-primary transition-colors font-bold"
-            >
-              Tools
+              Docs
             </Link>
             <Link
               href="/advertise"
@@ -258,6 +145,20 @@ export default function Navigation() {
                     >
                       Settings
                     </Link>
+                    {/* Admin Tab - Only show for admin users */}
+                    {(session.user as any)?.role === "admin" && (
+                      <Link
+                        href="/admin"
+                        onClick={() => setIsProfileMenuOpen(false)}
+                        className="px-4 py-3 text-orange-600 hover:bg-bg-surface hover:text-orange-500 transition-colors border-b-2 border-border flex items-center gap-2"
+                      >
+                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"></path>
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path>
+                        </svg>
+                        Admin
+                      </Link>
+                    )}
                     <button
                       onClick={() => {
                         setIsProfileMenuOpen(false);
@@ -274,15 +175,9 @@ export default function Navigation() {
               <>
                 <Link
                   href="/login"
-                  className="text-sm uppercase font-mono tracking-widest font-bold text-text-primary hover:text-accent transition-colors"
-                >
-                  Login
-                </Link>
-                <Link
-                  href="/login"
                   className="px-6 py-2 text-sm uppercase font-mono tracking-widest font-bold bg-text-primary text-bg-base hover:bg-text-muted transition-colors border-2 border-transparent"
                 >
-                  Sign Up
+                  login
                 </Link>
               </>
             )}
@@ -321,20 +216,6 @@ export default function Navigation() {
             className="px-6 py-4 border-b-2 border-border text-text-primary hover:bg-bg-inset transition-colors"
           >
             Directory
-          </Link>
-          <Link
-            href="/mcp"
-            onClick={() => setIsMobileMenuOpen(false)}
-            className="px-6 py-4 border-b-2 border-border text-text-primary hover:bg-bg-inset transition-colors"
-          >
-            MCP
-          </Link>
-          <Link
-            href="/tools"
-            onClick={() => setIsMobileMenuOpen(false)}
-            className="px-6 py-4 border-b-2 border-border text-text-primary hover:bg-bg-inset transition-colors"
-          >
-            Tools
           </Link>
           <Link
             href="/advertise"

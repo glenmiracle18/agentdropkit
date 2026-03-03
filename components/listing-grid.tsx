@@ -26,6 +26,12 @@ export default async function ListingGrid({ searchParams }: ListingGridProps) {
   const where: Prisma.ListingWhereInput = {};
   const conditions: Prisma.ListingWhereInput[] = [];
 
+  // Always hide ejected/invisible skills from public directory
+  conditions.push({
+    isVisible: true,
+    isEjected: false,
+  });
+
   // Apply filters
   if (search) {
     conditions.push({

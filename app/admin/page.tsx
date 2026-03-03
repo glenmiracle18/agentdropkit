@@ -1,10 +1,11 @@
 import { redirect } from "next/navigation";
 import { auth } from "@/lib/auth";
 import { headers } from "next/headers";
-import SyncTrigger from "@/components/sync-trigger";
+import { db } from "@/lib/db";
+import AdminDashboard from "@/components/admin-dashboard";
 
 export const metadata = {
-  title: "Admin - skills.claude",
+  title: "Admin - AgentDropkit",
   description: "Admin panel for managing the skills directory",
 };
 
@@ -17,48 +18,83 @@ export default async function AdminPage() {
     redirect("/login?from=/admin");
   }
 
-  // For now, allow any authenticated user (in production, add proper admin checks)
+  // Check if user has admin role
+  const user = await db.user.findUnique({
+    where: { id: session.user.id },
+    select: { role: true, email: true, name: true }
+  });
+
+  if (!user || user.role !== "admin") {
+    redirect("/");
+  }
+
+  // Fetch admin dashboard data
+  const [
+    totalUsers,
+    totalSubmissions,
+    pendingSubmissions,
+    totalListings,
+    recentSubmissions
+  ] = await Promise.all([
+    // Total users count
+    db.user.count(),
+    
+    // Total submissions count
+    db.submission.count(),
+    
+    // Pending submissions count
+    db.submission.count({
+      where: { status: "pending" }
+    }),
+    
+    // Total listings count
+    db.listing.count(),
+    
+    // Recent submissions for review
+    db.submission.findMany({
+      where: { status: "pending" },
+      include: {
+        user: {
+          select: { name: true, email: true, githubUsername: true }
+        }
+      },
+      orderBy: { createdAt: "desc" },
+      take: 10
+    })
+  ]);
+
+  // Calculate total installs across all listings
+  const installStats = await db.listing.aggregate({
+    _sum: {
+      totalInstalls: true,
+      weeklyInstalls: true
+    }
+  });
+
+  const dashboardData = {
+    totalUsers,
+    totalSubmissions,
+    pendingSubmissions,
+    totalListings,
+    totalInstalls: installStats._sum.totalInstalls || 0,
+    weeklyInstalls: installStats._sum.weeklyInstalls || 0,
+    recentSubmissions
+  };
 
   return (
     <main className="min-h-screen bg-bg-deep">
-      <div className="mx-auto max-w-4xl px-6 py-8">
+      <div className="mx-auto max-w-7xl px-6 py-8">
         {/* Header */}
         <div className="mb-12">
           <h1 className="text-4xl font-bold text-text-primary font-mono mb-4">
-            Admin Panel
+            Admin Dashboard
           </h1>
           <p className="text-lg text-text-secondary">
-            Manage and maintain the skills directory
+            Manage submissions, users, and monitor platform metrics
           </p>
         </div>
 
-        <div className="space-y-8">
-          {/* GitHub Sync Section */}
-          <div className="bg-bg-surface border border-border rounded-lg p-6">
-            <h2 className="text-xl font-semibold text-text-primary font-mono mb-4">
-              GitHub Data Sync
-            </h2>
-            <p className="text-text-secondary mb-6">
-              Manually trigger a sync of GitHub repository data including stars, forks, 
-              and install statistics for all listings.
-            </p>
-            
-            <SyncTrigger />
-          </div>
-
-          {/* Future admin features can be added here */}
-          <div className="bg-bg-surface border border-border rounded-lg p-6">
-            <h2 className="text-xl font-semibold text-text-primary font-mono mb-4">
-              Coming Soon
-            </h2>
-            <ul className="text-text-secondary space-y-2">
-              <li>• Review pending submissions</li>
-              <li>• Manage user accounts</li>
-              <li>• View analytics and metrics</li>
-              <li>• Content moderation tools</li>
-            </ul>
-          </div>
-        </div>
+        <AdminDashboard data={dashboardData} />
       </div>
     </main>
   );

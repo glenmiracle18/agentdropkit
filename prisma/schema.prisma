@@ -18,6 +18,7 @@ model User {
   image         String?
   githubId      String?   @unique
   githubUsername String?
+  role          UserRole  @default(user)
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt
   
@@ -78,6 +79,11 @@ model Verification {
 }
 
 // Application tables
+enum UserRole {
+  user
+  admin
+}
+
 enum ListingType {
   skill
   mcp
@@ -100,10 +106,18 @@ model Listing {
   authorHandle      String
   repoUrl           String
   repoPath          String?
+  installCommand    String?     // e.g., "npx agentdropkit add vercel/agent-browser"
   category          String
   tags              String[]
   compatibleAgents  String[]    @default([])
   triggerWords      String[]    @default([])
+  version           String      @default("1.0.0")
+  homepageUrl       String?
+  skillDependencies String[]    @default([])
+  npmDependencies   String[]    @default([])
+  binaryDependencies String[]   @default([])
+  language          String?
+  framework         String?
   isOpenSource      Boolean     @default(true)
   license           String      @default("MIT")
   documentation     String?
@@ -117,11 +131,16 @@ model Listing {
   voteCount         Int         @default(0)
   files             Json        @default("[]")
   agentsInstalledOn Json        @default("{}")
+  isVisible         Boolean     @default(true)
+  isEjected         Boolean     @default(false)
+  ejectedAt         DateTime?
+  ejectedBy         String?
   firstSeenAt       DateTime    @default(now())
   createdAt         DateTime    @default(now())
   updatedAt         DateTime    @updatedAt
   
   votes             Vote[]
+  skill             Skill?
 
   @@map("listings")
 }
@@ -150,6 +169,7 @@ model Submission {
   category         String
   repoUrl          String
   repoPath         String?
+  installCommand   String?          // Auto-generated from repoUrl and authorHandle
   tags             String[]         @default([])
   authorHandle     String
   compatibleAgents String[]         @default([])
@@ -165,4 +185,38 @@ model Submission {
   user             User             @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@map("submissions")
+}
+
+model Skill {
+  id              String      @id @default(cuid())
+  listingId       String      @unique
+  name            String      @unique
+  description     String
+  instructions    String      // Main SKILL.md content
+  fileStructure   Json        @default("{}") // Directory structure mapping
+  triggerKeywords String[]    @default([]) // Extracted from description for search
+  createdAt       DateTime    @default(now())
+  updatedAt       DateTime    @updatedAt
+  
+  listing         Listing     @relation(fields: [listingId], references: [id], onDelete: Cascade)
+  files           SkillFile[]
+
+  @@map("skills")
+}
+
+model SkillFile {
+  id           String   @id @default(cuid())
+  skillId      String
+  filePath     String   // Relative path like "scripts/utility.py"
+  fileName     String   // Just the filename
+  fileContent  String   // Actual file content
+  fileType     String   // "markdown", "script", "resource", "template"
+  isExecutable Boolean  @default(false)
+  fileSize     Int      @default(0)
+  createdAt    DateTime @default(now())
+  
+  skill        Skill    @relation(fields: [skillId], references: [id], onDelete: Cascade)
+
+  @@unique([skillId, filePath])
+  @@map("skill_files")
 }

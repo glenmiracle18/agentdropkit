@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useState } from "react";
+import { generateInstallCommandWithScopes } from "@/lib/install-command";
 
 interface SkillDetailClientProps {
   skill: any;
@@ -12,9 +13,28 @@ export default function SkillDetailClient({ skill }: SkillDetailClientProps) {
   const [upvotes, setUpvotes] = useState(skill.upvotes || 0);
   const [hasUpvoted, setHasUpvoted] = useState(skill.userVote === 1);
   const [selectedFile, setSelectedFile] = useState(skill.files?.[0] || null);
+  const [installScope, setInstallScope] = useState<'default' | 'global' | 'project'>('default');
+
+  // Generate install commands for different scopes
+  const installCommands = generateInstallCommandWithScopes({
+    repoUrl: skill.repository ? `https://${skill.repository}` : skill.command || "",
+    authorHandle: skill.authorHandle,
+    skillName: skill.name
+  });
+
+  const getCurrentCommand = () => {
+    switch (installScope) {
+      case 'global':
+        return installCommands.global;
+      case 'project':
+        return installCommands.project;
+      default:
+        return installCommands.default;
+    }
+  };
 
   const handleCopy = () => {
-    navigator.clipboard.writeText(skill.command);
+    navigator.clipboard.writeText(getCurrentCommand());
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
   };
@@ -71,7 +91,47 @@ export default function SkillDetailClient({ skill }: SkillDetailClientProps) {
 
           {/* Install Command */}
           <div className="mb-8 md:mb-12">
-            <h3 className="text-sm font-bold text-text-muted uppercase tracking-widest mb-3">Install Command</h3>
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-4">
+              <h3 className="text-sm font-bold text-text-muted uppercase tracking-widest">Install Command</h3>
+              
+              {/* Scope Selector */}
+              <div className="flex items-center gap-2 text-sm">
+                <span className="text-text-secondary font-medium">Scope:</span>
+                <div className="flex border-2 border-border bg-bg-base">
+                  <button
+                    onClick={() => setInstallScope('default')}
+                    className={`px-3 py-1 text-xs font-medium transition-colors border-r border-border ${
+                      installScope === 'default' 
+                        ? 'bg-accent text-white' 
+                        : 'text-text-primary hover:bg-bg-card'
+                    }`}
+                  >
+                    Default
+                  </button>
+                  <button
+                    onClick={() => setInstallScope('global')}
+                    className={`px-3 py-1 text-xs font-medium transition-colors border-r border-border ${
+                      installScope === 'global' 
+                        ? 'bg-accent text-white' 
+                        : 'text-text-primary hover:bg-bg-card'
+                    }`}
+                  >
+                    Global
+                  </button>
+                  <button
+                    onClick={() => setInstallScope('project')}
+                    className={`px-3 py-1 text-xs font-medium transition-colors ${
+                      installScope === 'project' 
+                        ? 'bg-accent text-white' 
+                        : 'text-text-primary hover:bg-bg-card'
+                    }`}
+                  >
+                    Project
+                  </button>
+                </div>
+              </div>
+            </div>
+
             <div className="bg-text-primary text-bg-base p-1 flex flex-col sm:flex-row shadow-[4px_4px_0px_0px_var(--color-accent)] md:shadow-[6px_6px_0px_0px_var(--color-accent)]">
               <div className="flex items-center gap-3 px-4 overflow-x-auto py-3 sm:py-0 w-full">
                 <svg className="w-5 h-5 text-accent shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2">
@@ -79,7 +139,7 @@ export default function SkillDetailClient({ skill }: SkillDetailClientProps) {
                   <path d="m9 9 3 3-3 3"/>
                   <path d="m15 15h-3"/>
                 </svg>
-                <code className="font-mono text-xs sm:text-sm whitespace-nowrap">{skill.command}</code>
+                <code className="font-mono text-xs sm:text-sm whitespace-nowrap">{getCurrentCommand()}</code>
               </div>
               <button 
                 onClick={handleCopy}
@@ -102,6 +162,19 @@ export default function SkillDetailClient({ skill }: SkillDetailClientProps) {
                   </>
                 )}
               </button>
+            </div>
+
+            {/* Scope Description */}
+            <div className="mt-3 text-xs text-text-dim">
+              {installScope === 'default' && (
+                <p>Default installation - CLI will prompt you to choose between global and project scope</p>
+              )}
+              {installScope === 'global' && (
+                <p>Global installation - Available across all projects in <code className="bg-bg-card px-1 py-0.5 font-mono">~/.claude/skills/</code></p>
+              )}
+              {installScope === 'project' && (
+                <p>Project installation - Only available in current project directory <code className="bg-bg-card px-1 py-0.5 font-mono">./claude/skills/</code></p>
+              )}
             </div>
           </div>
 

@@ -6,10 +6,10 @@ import { headers } from "next/headers";
 import SkillDetailClient from "./skill-detail-client";
 
 interface DetailPageProps {
-  params: {
+  params: Promise<{
     author: string;
     slug: string;
-  };
+  }>;
 }
 
 // Function to get appropriate icon for skill
@@ -50,10 +50,11 @@ function getSkillIcon(skillName: string) {
 }
 
 export async function generateMetadata({ params }: DetailPageProps) {
+  const { author, slug } = await params;
   const listing = await db.listing.findFirst({
     where: {
-      authorHandle: params.author,
-      slug: params.slug,
+      authorHandle: author,
+      slug: slug,
     },
   });
 
@@ -70,11 +71,21 @@ export async function generateMetadata({ params }: DetailPageProps) {
 }
 
 export default async function DetailPage({ params }: DetailPageProps) {
+  const { author, slug } = await params;
   const listing = await db.listing.findFirst({
     where: {
-      authorHandle: params.author,
-      slug: params.slug,
+      authorHandle: author,
+      slug: slug,
+      isVisible: true,
+      isEjected: false,
     },
+    include: {
+      skill: {
+        include: {
+          files: true
+        }
+      }
+    }
   });
 
   if (!listing) {
@@ -89,19 +100,45 @@ export default async function DetailPage({ params }: DetailPageProps) {
   const userVote = session?.user
     ? await db.vote.findUnique({
       where: {
-        userId_listingId: {
-          userId: session.user.id,
+        listingId_userId: {
           listingId: listing.id,
+          userId: session.user.id,
         },
       },
       select: { value: true },
     })
     : null;
 
+  // Process files - handle both old format (JSON) and new format (related SkillFile records)
+  let skillFiles: any[] = [];
+  
+  if (listing.skill?.files && Array.isArray(listing.skill.files)) {
+    // New format: SkillFile records from database
+    skillFiles = listing.skill.files.map((file: any) => ({
+      name: file.fileName,
+      path: file.filePath,
+      content: file.fileContent,
+      type: file.fileType,
+      executable: file.isExecutable,
+      size: file.fileSize
+    }));
+  } else if (listing.files && typeof listing.files === 'string') {
+    // Old format: JSON string in listing.files
+    try {
+      skillFiles = JSON.parse(listing.files);
+    } catch (error) {
+      console.warn('Failed to parse legacy files JSON:', error);
+      skillFiles = [];
+    }
+  } else if (Array.isArray(listing.files)) {
+    // Old format: JSON array in listing.files
+    skillFiles = listing.files;
+  }
+
   const skillData = {
     ...listing,
     icon: getSkillIcon(listing.name),
-    triggerPhrases: [listing.installCommand],
+    triggerPhrases: listing.triggerWords || [],
     repository: listing.repoUrl.replace('https://', ''),
     upvotes: listing.voteCount,
     stars: listing.githubStars,
@@ -111,10 +148,11 @@ export default async function DetailPage({ params }: DetailPageProps) {
       day: 'numeric',
       year: 'numeric'
     }),
-    command: listing.installCommand,
-    overview: listing.longDescription || '',
+    command: listing.repoUrl, // Use repo URL as command for now
+    overview: listing.longDescription || listing.description || '',
     faq: [],
-    userVote: userVote?.value || null
+    userVote: userVote?.value || null,
+    files: skillFiles
   };
 
   return (
