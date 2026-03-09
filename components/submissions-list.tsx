@@ -1,8 +1,9 @@
 import Link from "next/link";
 import SubmitHeaderIcon from "@/components/submit-header-icon";
 import { IconFolderSend } from "@/public/assets/arcade-icons";
+import type { Submission } from "@prisma/client";
 
-const statusConfig = {
+const statusConfig: Record<string, { color: string; bg: string; border: string; label: string }> = {
     pending: {
         color: "text-yellow-400",
         bg: "bg-yellow-400/10",
@@ -30,7 +31,7 @@ const statusConfig = {
 };
 
 interface SubmissionsListProps {
-    submissions: any[];
+    submissions: Submission[];
 }
 
 export default function SubmissionsList({ submissions }: SubmissionsListProps) {
@@ -62,7 +63,7 @@ export default function SubmissionsList({ submissions }: SubmissionsListProps) {
 
             <div className="space-y-8">
                 {submissions.map((submission) => {
-                    const status = statusConfig[submission.status as keyof typeof statusConfig] || statusConfig.pending;
+                    const status = statusConfig[submission.status] ?? statusConfig.pending;
 
                     return (
                         <div key={submission.id} className="bg-bg-surface border border-border border-dashed p-8 space-y-8">
@@ -121,7 +122,7 @@ export default function SubmissionsList({ submissions }: SubmissionsListProps) {
                                 <div>
                                     <h4 className="text-sm font-semibold text-text-primary mb-2">Submitted</h4>
                                     <p className="text-text-secondary">
-                                        {new Date(submission.submittedAt).toLocaleDateString()}
+                                        {new Date(submission.createdAt).toLocaleDateString()}
                                     </p>
                                 </div>
                             </div>

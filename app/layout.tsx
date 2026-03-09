@@ -4,6 +4,7 @@ import Navigation from "@/components/navigation";
 import SiteFooter from "@/components/site-footer";
 import { ThemeProvider } from "@/components/theme-provider";
 import { ToastProvider } from "@/components/toast-provider";
+import QueryProvider from "@/components/query-provider";
 
 export const metadata: Metadata = {
   title: "skills.claude - Prebuilt Claude Skills Directory",
@@ -31,19 +32,21 @@ export default function RootLayout({
         />
       </head>
       <body className="antialiased flex flex-col min-h-screen">
-        <ThemeProvider
-          attribute="class"
-          defaultTheme="system"
-          enableSystem
-          disableTransitionOnChange
-        >
-          <ToastProvider />
-          <Navigation />
-          <div className="flex-1">
-            {children}
-          </div>
-          <SiteFooter />
-        </ThemeProvider>
+        <QueryProvider>
+          <ThemeProvider
+            attribute="class"
+            defaultTheme="system"
+            enableSystem
+            disableTransitionOnChange
+          >
+            <ToastProvider />
+            <Navigation />
+            <div className="flex-1">
+              {children}
+            </div>
+            <SiteFooter />
+          </ThemeProvider>
+        </QueryProvider>
       </body>
     </html>
   );

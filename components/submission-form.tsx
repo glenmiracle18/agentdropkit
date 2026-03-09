@@ -2,8 +2,10 @@
 
 import { useState, useCallback, useMemo, useEffect } from "react";
 import { useRouter } from "next/navigation";
+import { useQueryClient } from "@tanstack/react-query";
 import { sileo } from "sileo";
 import { generateInstallCommand } from "@/lib/install-command";
+import { submissionsQueryKey } from "@/lib/queries/submissions";
 
 interface User {
   id: string;
@@ -140,6 +142,7 @@ function RotatingAnalysisMessage() {
 
 export default function SubmissionForm({ user }: SubmissionFormProps) {
   const router = useRouter();
+  const queryClient = useQueryClient();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
@@ -460,7 +463,8 @@ export default function SubmissionForm({ user }: SubmissionFormProps) {
         duration: 3000,
       });
 
-      // Delay navigation so the success toast is visible
+      // Invalidate cache so submissions list refetches, then navigate
+      await queryClient.invalidateQueries({ queryKey: submissionsQueryKey });
       setTimeout(() => router.push("/submit"), 2000);
     } catch (err) {
       const errorMessage =
