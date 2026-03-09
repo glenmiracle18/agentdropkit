@@ -249,6 +249,13 @@ export default function SubmissionForm({ user }: SubmissionFormProps) {
     }
   };
 
+  const handleTagPaste = (e: React.ClipboardEvent<HTMLInputElement>) => {
+    const pasted = e.clipboardData.getData("text");
+    if (!pasted.includes(",")) return;
+    e.preventDefault();
+    pasted.split(",").map((t) => t.trim()).filter(Boolean).forEach(addTag);
+  };
+
   const handleTriggerWordInput = (e: React.KeyboardEvent<HTMLInputElement>) => {
     if (e.key === ",") {
       e.preventDefault();
@@ -265,6 +272,13 @@ export default function SubmissionForm({ user }: SubmissionFormProps) {
       const lastWord = formData.triggerWords[formData.triggerWords.length - 1];
       removeTriggerWord(lastWord);
     }
+  };
+
+  const handleTriggerWordPaste = (e: React.ClipboardEvent<HTMLInputElement>) => {
+    const pasted = e.clipboardData.getData("text");
+    if (!pasted.includes(",")) return;
+    e.preventDefault();
+    pasted.split(",").map((t) => t.trim()).filter(Boolean).forEach(addTriggerWord);
   };
 
   const analyzeRepository = useCallback(async (repoUrl: string) => {
@@ -784,6 +798,7 @@ export default function SubmissionForm({ user }: SubmissionFormProps) {
                     value={currentTag}
                     onChange={(e) => setCurrentTag(e.target.value)}
                     onKeyDown={handleTagInput}
+                    onPaste={handleTagPaste}
                     className="flex-1 min-w-[120px] bg-transparent border-none outline-none text-text-primary placeholder-text-dim"
                     placeholder={
                       formData.tags.length === 0
@@ -907,6 +922,7 @@ export default function SubmissionForm({ user }: SubmissionFormProps) {
                   value={currentTriggerWord}
                   onChange={(e) => setCurrentTriggerWord(e.target.value)}
                   onKeyDown={handleTriggerWordInput}
+                  onPaste={handleTriggerWordPaste}
                   className="flex-1 min-w-[120px] bg-transparent border-none outline-none text-text-primary placeholder-text-dim"
                   placeholder={
                     formData.triggerWords.length === 0

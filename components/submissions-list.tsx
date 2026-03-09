@@ -67,19 +67,17 @@ export default function SubmissionsList({ submissions }: SubmissionsListProps) {
                     return (
                         <div key={submission.id} className="bg-bg-surface border border-border border-dashed p-8 space-y-8">
                             {/* Header with name and status */}
-                            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-                                <div>
-                                    <h3 className="text-2xl font-bold text-text-primary font-mono mb-2">
+                            <div className="flex items-start justify-between gap-4">
+                                <div className="min-w-0 flex-1">
+                                    <h3 className="text-2xl font-bold text-text-primary font-mono mb-2 truncate">
                                         {submission.name}
                                     </h3>
-                                    <p className="text-text-secondary max-w-2xl">
-                                        <span className="block truncate" title={submission.description}>
-                                            {submission.description}
-                                        </span>
+                                    <p className="text-text-secondary truncate" title={submission.description}>
+                                        {submission.description}
                                     </p>
                                 </div>
-                                <div className={`inline-flex items-center px-4 py-2  border ${status.bg} ${status.border} shrink-0`}>
-                                    <span className={`font-medium ${status.color}`}>
+                                <div className={`inline-flex items-center px-4 py-2 border ${status.bg} ${status.border} shrink-0`}>
+                                    <span className={`font-medium ${status.color} whitespace-nowrap`}>
                                         {status.label}
                                     </span>
                                 </div>
