@@ -24,7 +24,7 @@ interface FormData {
   category: string;
   repoUrl: string;
   repoPath: string;
-  tags: string;
+  tags: string[];
   authorHandle: string;
   compatibleAgents: string[];
   triggerWords: string[];
@@ -84,6 +84,7 @@ export default function SubmissionForm({ user }: SubmissionFormProps) {
   const [detectedSkills, setDetectedSkills] = useState<Record<string, any>>({});
   const [selectedSkillPath, setSelectedSkillPath] = useState<string>("");
   const [currentTriggerWord, setCurrentTriggerWord] = useState("");
+  const [currentTag, setCurrentTag] = useState("");
 
   const [formData, setFormData] = useState<FormData>({
     name: "",
@@ -93,7 +94,7 @@ export default function SubmissionForm({ user }: SubmissionFormProps) {
     category: "Development",
     repoUrl: "",
     repoPath: "",
-    tags: "",
+    tags: [],
     authorHandle:
       user.githubUsername || user.name?.toLowerCase().replace(/\s+/g, "") || "",
     compatibleAgents: [],
@@ -155,6 +156,34 @@ export default function SubmissionForm({ user }: SubmissionFormProps) {
       ...prev,
       triggerWords: prev.triggerWords.filter((word) => word !== wordToRemove),
     }));
+  };
+
+  const addTag = (tag: string) => {
+    const trimmedTag = tag.trim();
+    if (trimmedTag && !formData.tags.includes(trimmedTag)) {
+      setFormData((prev) => ({
+        ...prev,
+        tags: [...prev.tags, trimmedTag],
+      }));
+    }
+    setCurrentTag("");
+  };
+
+  const removeTag = (tagToRemove: string) => {
+    setFormData((prev) => ({
+      ...prev,
+      tags: prev.tags.filter((tag) => tag !== tagToRemove),
+    }));
+  };
+
+  const handleTagInput = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === "," || e.key === "Enter") {
+      e.preventDefault();
+      addTag(currentTag);
+    } else if (e.key === "Backspace" && currentTag === "" && formData.tags.length > 0) {
+      const lastTag = formData.tags[formData.tags.length - 1];
+      removeTag(lastTag);
+    }
   };
 
   const handleTriggerWordInput = (e: React.KeyboardEvent<HTMLInputElement>) => {
@@ -334,10 +363,6 @@ export default function SubmissionForm({ user }: SubmissionFormProps) {
         },
         body: JSON.stringify({
           ...formData,
-          tags: formData.tags
-            .split(",")
-            .map((tag) => tag.trim())
-            .filter(Boolean),
           triggerWords: formData.triggerWords,
           selectedSkillPath: selectedSkillPath,
         }),
@@ -661,21 +686,53 @@ export default function SubmissionForm({ user }: SubmissionFormProps) {
             </div>
 
             <div>
-              <label
-                htmlFor="tags"
-                className="block text-sm font-medium text-text-primary mb-2"
-              >
+              <label className="block text-sm font-medium text-text-primary mb-2">
                 Tags
               </label>
-              <input
-                type="text"
-                id="tags"
-                name="tags"
-                value={formData.tags}
-                onChange={handleInputChange}
-                className="w-full px-3 py-2 bg-bg-deep border border-border rounded-sm text-text-primary placeholder-text-dim focus:border-accent focus:outline-none"
-                placeholder="python, api, automation (comma separated)"
-              />
+              <div className="border border-border rounded-sm p-2 bg-bg-deep focus-within:border-accent min-h-[44px]">
+                <div className="flex flex-wrap gap-2 items-center">
+                  {formData.tags.map((tag, index) => (
+                    <div
+                      key={`${tag}-${index}`}
+                      className="group inline-flex items-center gap-1 px-2 py-1 bg-bg-card border border-border rounded text-xs font-medium text-text-primary hover:border-accent transition-all duration-200 animate-in fade-in slide-in-from-bottom-1"
+                    >
+                      <span>{tag}</span>
+                      <button
+                        type="button"
+                        onClick={() => removeTag(tag)}
+                        className="opacity-0 group-hover:opacity-100 transition-all duration-150 ml-1 p-0.5 hover:bg-red-500 hover:text-white rounded-full hover:scale-110"
+                        title="Remove tag"
+                      >
+                        <svg
+                          className="w-3 h-3"
+                          fill="none"
+                          stroke="currentColor"
+                          viewBox="0 0 24 24"
+                          strokeWidth="2"
+                        >
+                          <line x1="18" y1="6" x2="6" y2="18" />
+                          <line x1="6" y1="6" x2="18" y2="18" />
+                        </svg>
+                      </button>
+                    </div>
+                  ))}
+                  <input
+                    type="text"
+                    value={currentTag}
+                    onChange={(e) => setCurrentTag(e.target.value)}
+                    onKeyDown={handleTagInput}
+                    className="flex-1 min-w-[120px] bg-transparent border-none outline-none text-text-primary placeholder-text-dim"
+                    placeholder={
+                      formData.tags.length === 0
+                        ? "Type tags and press comma or enter..."
+                        : "Add more..."
+                    }
+                  />
+                </div>
+              </div>
+              <p className="text-xs text-text-dim mt-2">
+                Type tags like "python", "api", "automation" and press comma or enter to add them.
+              </p>
             </div>
           </div>
 
