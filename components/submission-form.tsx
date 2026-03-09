@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback, useMemo } from "react";
+import { useState, useCallback, useMemo, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { sileo } from "sileo";
 import { generateInstallCommand } from "@/lib/install-command";
@@ -74,6 +74,69 @@ const availableAgents = [
   "AI21 Jurassic",
   "Other",
 ];
+
+const analyzeMessages = [
+  "Analysing repository...",
+  "Searching for /skills directory...",
+  "Fetching through skill files...",
+  "Parsing SKILL.md metadata...",
+  "Detecting trigger keywords...",
+  "Checking README for docs...",
+  "Reading repository tree...",
+  "Almost there...",
+];
+
+const ROTATE_KEYFRAMES = `
+  @keyframes __adk_msg_in {
+    from { opacity: 0; transform: translateY(7px); }
+    to   { opacity: 1; transform: translateY(0px); }
+  }
+  @keyframes __adk_msg_out {
+    from { opacity: 1; transform: translateY(0px); }
+    to   { opacity: 0; transform: translateY(-7px); }
+  }
+`;
+
+function RotatingAnalysisMessage() {
+  const [msgIndex, setMsgIndex] = useState(0);
+  const [exiting, setExiting] = useState(false);
+
+  // Schedule the next exit after a random 3–5 s window
+  useEffect(() => {
+    if (exiting) return;
+    const delay = 3000 + Math.random() * 2000;
+    const t = setTimeout(() => setExiting(true), delay);
+    return () => clearTimeout(t);
+  }, [msgIndex, exiting]);
+
+  // After the exit animation plays, swap the message and start the enter
+  useEffect(() => {
+    if (!exiting) return;
+    const t = setTimeout(() => {
+      setMsgIndex((prev) => (prev + 1) % analyzeMessages.length);
+      setExiting(false);
+    }, 260);
+    return () => clearTimeout(t);
+  }, [exiting]);
+
+  return (
+    <>
+      <style>{ROTATE_KEYFRAMES}</style>
+      <span
+        key={`${msgIndex}-${exiting}`}
+        style={{
+          display: "inline-block",
+          animationName: exiting ? "__adk_msg_out" : "__adk_msg_in",
+          animationDuration: "0.25s",
+          animationTimingFunction: "ease",
+          animationFillMode: "forwards",
+        }}
+      >
+        {analyzeMessages[msgIndex]}
+      </span>
+    </>
+  );
+}
 
 export default function SubmissionForm({ user }: SubmissionFormProps) {
   const router = useRouter();
@@ -215,7 +278,7 @@ export default function SubmissionForm({ user }: SubmissionFormProps) {
     // Show persistent loading toast
     const loadingToast = sileo.show({
       title: "Analyzing Repository",
-      description: "Scanning for agent skills, file structure, and metadata...",
+      description: <RotatingAnalysisMessage />,
       type: "loading",
       duration: null, // persistent
     });
