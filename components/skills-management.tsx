@@ -1,37 +1,19 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 import { sileo } from "sileo";
 import ConfirmationDialog from "./confirmation-dialog";
+import { useAdminSkills, useAdminSkillAction, adminSkillsQueryKey } from "@/lib/queries/admin";
+import type { Listing } from "@prisma/client";
 
-interface Skill {
-  id: string;
-  slug: string;
-  name: string;
-  type: string;
-  description: string;
-  authorHandle: string;
-  repoUrl: string;
-  category: string;
-  tags: string[];
-  isOfficial: boolean;
-  isSafe: boolean;
-  healthScore: number;
-  githubStars: number;
-  totalInstalls: number;
-  weeklyInstalls: number;
-  voteCount: number;
-  isVisible: boolean;
-  isEjected: boolean;
-  ejectedAt?: Date;
-  ejectedBy?: string;
-  createdAt: Date;
-  updatedAt: Date;
-}
+type SkillAction = "eject" | "restore" | "delete" | "toggle-safe" | "toggle-official";
 
 export default function SkillsManagement() {
-  const [skills, setSkills] = useState<Skill[]>([]);
-  const [loading, setLoading] = useState(true);
+  const { data: skills = [], isLoading: loading } = useAdminSkills();
+  const queryClient = useQueryClient();
+  const { mutate: performAction } = useAdminSkillAction();
+
   const [searchTerm, setSearchTerm] = useState("");
   const [typeFilter, setTypeFilter] = useState<string>("all");
   const [categoryFilter, setCategoryFilter] = useState<string>("all");
@@ -55,54 +37,6 @@ export default function SkillsManagement() {
     onConfirm: () => { },
   });
 
-  useEffect(() => {
-    fetchSkills();
-  }, []);
-
-  const fetchSkills = async () => {
-    try {
-      const response = await fetch("/api/admin/skills");
-      if (!response.ok) throw new Error("Failed to fetch skills");
-      const data = await response.json();
-
-      // Transform the data to match our interface
-      const transformedSkills = (data.skills || []).map((listing: any) => ({
-        id: listing.id,
-        slug: listing.slug,
-        name: listing.name,
-        type: listing.type,
-        description: listing.description,
-        authorHandle: listing.authorHandle,
-        repoUrl: listing.repoUrl,
-        category: listing.category,
-        tags: listing.tags || [],
-        isOfficial: listing.isOfficial,
-        isSafe: listing.isSafe,
-        healthScore: listing.healthScore,
-        githubStars: listing.githubStars,
-        totalInstalls: listing.totalInstalls,
-        weeklyInstalls: listing.weeklyInstalls,
-        voteCount: listing.voteCount,
-        isVisible: listing.isVisible ?? true,
-        isEjected: listing.isEjected ?? false,
-        ejectedAt: listing.ejectedAt,
-        ejectedBy: listing.ejectedBy,
-        createdAt: listing.createdAt,
-        updatedAt: listing.updatedAt,
-      }));
-
-      setSkills(transformedSkills);
-    } catch (error) {
-      sileo.error({
-        title: "Failed to load skills",
-        description: "Could not fetch skills data. Please refresh the page.",
-        duration: 6000,
-      });
-    } finally {
-      setLoading(false);
-    }
-  };
-
   const showConfirmation = (
     title: string,
     message: string,
@@ -110,21 +44,14 @@ export default function SkillsManagement() {
     variant: "danger" | "warning" | "info",
     onConfirm: () => void
   ) => {
-    setConfirmationDialog({
-      isOpen: true,
-      title,
-      message,
-      confirmText,
-      variant,
-      onConfirm,
-    });
+    setConfirmationDialog({ isOpen: true, title, message, confirmText, variant, onConfirm });
   };
 
   const hideConfirmation = () => {
     setConfirmationDialog(prev => ({ ...prev, isOpen: false }));
   };
 
-  const handleSkillActionConfirmed = async (skillId: string, action: "eject" | "restore" | "delete" | "toggle-safe" | "toggle-official") => {
+  const handleSkillActionConfirmed = (skillId: string, action: SkillAction) => {
     const skill = skills.find(s => s.id === skillId);
     if (!skill) return;
 
@@ -161,57 +88,27 @@ export default function SkillsManagement() {
       duration: null,
     });
 
-    try {
-      const response = await fetch(`/api/admin/skills`, {
-        method: "PATCH",
-        headers: {
-          "Content-Type": "application/json",
+    performAction(
+      { skillId, action },
+      {
+        onSuccess: () => {
+          sileo.dismiss(loadingToast);
+          sileo.success({ title: "Action Completed", description: successMessage, duration: 4000 });
+          hideConfirmation();
         },
-        body: JSON.stringify({ skillId, action }),
-      });
-
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}));
-        throw new Error(errorData.error || "Failed to perform action");
+        onError: (error) => {
+          sileo.dismiss(loadingToast);
+          sileo.error({
+            title: "Action Failed",
+            description: error instanceof Error ? error.message : "Failed to perform action",
+            duration: 6000,
+          });
+        },
       }
-
-      sileo.dismiss(loadingToast);
-      sileo.success({
-        title: "Action Completed",
-        description: successMessage,
-        duration: 4000,
-      });
-
-      // Update local state instead of refetching
-      if (action === 'delete') {
-        setSkills(prevSkills => prevSkills.filter(s => s.id !== skillId));
-      } else {
-        setSkills(prevSkills =>
-          prevSkills.map(s =>
-            s.id === skillId
-              ? {
-                ...s,
-                isSafe: action === 'toggle-safe' ? !s.isSafe : s.isSafe,
-                isOfficial: action === 'toggle-official' ? !s.isOfficial : s.isOfficial,
-                isEjected: action === 'eject' ? true : action === 'restore' ? false : s.isEjected,
-                isVisible: action === 'eject' ? false : action === 'restore' ? true : s.isVisible
-              }
-              : s
-          )
-        );
-      }
-      hideConfirmation();
-    } catch (error) {
-      sileo.dismiss(loadingToast);
-      sileo.error({
-        title: "Action Failed",
-        description: error instanceof Error ? error.message : "Failed to perform action",
-        duration: 6000,
-      });
-    }
+    );
   };
 
-  const handleSkillAction = (skillId: string, action: "eject" | "restore" | "delete" | "toggle-safe" | "toggle-official") => {
+  const handleSkillAction = (skillId: string, action: SkillAction) => {
     const skill = skills.find(s => s.id === skillId);
     if (!skill) return;
 
@@ -232,7 +129,6 @@ export default function SkillsManagement() {
         () => handleSkillActionConfirmed(skillId, action)
       );
     } else {
-      // Non-destructive actions don't need confirmation
       handleSkillActionConfirmed(skillId, action);
     }
   };
@@ -257,39 +153,21 @@ export default function SkillsManagement() {
         });
 
         try {
-          // Process all selected skills
-          const promises = selectedSkills.map(skillId =>
-            fetch("/api/admin/skills", {
-              method: "PATCH",
-              headers: {
-                "Content-Type": "application/json",
-              },
-              body: JSON.stringify({ skillId, action }),
-            })
+          await Promise.all(
+            selectedSkills.map(skillId =>
+              fetch("/api/admin/skills", {
+                method: "PATCH",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ skillId, action }),
+              })
+            )
           );
-
-          await Promise.all(promises);
-
-          // Update local state
-          if (action === 'delete') {
-            setSkills(prevSkills => prevSkills.filter(s => !selectedSkills.includes(s.id)));
-          } else {
-            setSkills(prevSkills =>
-              prevSkills.map(s =>
-                selectedSkills.includes(s.id)
-                  ? {
-                    ...s,
-                    isEjected: action === 'eject' ? true : action === 'restore' ? false : s.isEjected,
-                    isVisible: action === 'eject' ? false : action === 'restore' ? true : s.isVisible
-                  }
-                  : s
-              )
-            );
-          }
 
           setSelectedSkills([]);
           setBulkActionMode(false);
           hideConfirmation();
+
+          await queryClient.invalidateQueries({ queryKey: adminSkillsQueryKey });
 
           sileo.dismiss(loadingToast);
           sileo.success({
@@ -297,8 +175,7 @@ export default function SkillsManagement() {
             description: `Successfully ${actionText}ed ${selectedSkills.length} skills.`,
             duration: 4000,
           });
-
-        } catch (error) {
+        } catch {
           sileo.dismiss(loadingToast);
           sileo.error({
             title: "Bulk Action Failed",
@@ -312,9 +189,7 @@ export default function SkillsManagement() {
 
   const toggleSkillSelection = (skillId: string) => {
     setSelectedSkills(prev =>
-      prev.includes(skillId)
-        ? prev.filter(id => id !== skillId)
-        : [...prev, skillId]
+      prev.includes(skillId) ? prev.filter(id => id !== skillId) : [...prev, skillId]
     );
   };
 
@@ -326,15 +201,17 @@ export default function SkillsManagement() {
     }
   };
 
-  const filteredSkills = skills.filter(skill => {
-    const matchesSearch = skill.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      skill.description.toLowerCase().includes(searchTerm.toLowerCase()) ||
+  const filteredSkills = skills.filter((skill: Listing) => {
+    const matchesSearch =
+      skill.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      (skill.description ?? '').toLowerCase().includes(searchTerm.toLowerCase()) ||
       skill.authorHandle.toLowerCase().includes(searchTerm.toLowerCase());
     const matchesType = typeFilter === "all" || skill.type === typeFilter;
     const matchesCategory = categoryFilter === "all" || skill.category === categoryFilter;
-    const matchesStatus = statusFilter === "all" ||
-      (statusFilter === "published" && !skill.isEjected) ||
-      (statusFilter === "ejected" && skill.isEjected);
+    const matchesStatus =
+      statusFilter === "all" ||
+      (statusFilter === "published" && !(skill.isEjected ?? false)) ||
+      (statusFilter === "ejected" && (skill.isEjected ?? false));
 
     return matchesSearch && matchesType && matchesCategory && matchesStatus;
   });
@@ -382,10 +259,7 @@ export default function SkillsManagement() {
                 {selectedSkills.length} selected
               </span>
               <button
-                onClick={() => {
-                  setBulkActionMode(false);
-                  setSelectedSkills([]);
-                }}
+                onClick={() => { setBulkActionMode(false); setSelectedSkills([]); }}
                 className="px-3 py-1 bg-gray-600 text-white text-xs font-medium hover:bg-gray-700 transition-colors border border-gray-700"
               >
                 Cancel
@@ -510,7 +384,7 @@ export default function SkillsManagement() {
           </div>
         ) : (
           <div className="divide-y divide-border">
-            {filteredSkills.map((skill) => (
+            {filteredSkills.map((skill: Listing) => (
               <div key={skill.id} className="p-6">
                 <div className="flex items-start justify-between">
                   {bulkActionMode && (
@@ -545,14 +419,13 @@ export default function SkillsManagement() {
                           Safe
                         </span>
                       )}
-                      {skill.isEjected && (
+                      {(skill.isEjected ?? false) && (
                         <span className="inline-flex items-center px-2 py-1 text-xs font-medium bg-red-100 text-red-800 border border-red-300">
                           Ejected
                         </span>
                       )}
                       <svg
-                        className={`w-4 h-4 text-text-dim transition-transform duration-200 ${selectedSkill === skill.id ? 'rotate-180' : ''
-                          }`}
+                        className={`w-4 h-4 text-text-dim transition-transform duration-200 ${selectedSkill === skill.id ? 'rotate-180' : ''}`}
                         fill="none"
                         stroke="currentColor"
                         viewBox="0 0 24 24"
@@ -592,13 +465,13 @@ export default function SkillsManagement() {
                   </div>
 
                   <div className="flex items-center gap-2 ml-4">
-                    {!skill.isEjected ? (
+                    {!(skill.isEjected ?? false) ? (
                       <>
                         <button
                           onClick={() => handleSkillAction(skill.id, "toggle-safe")}
                           className={`px-3 py-1 text-xs font-medium transition-colors ${skill.isSafe
-                              ? "bg-yellow-600 text-white hover:bg-yellow-700"
-                              : "bg-green-600 text-white hover:bg-green-700"
+                            ? "bg-yellow-600 text-white hover:bg-yellow-700"
+                            : "bg-green-600 text-white hover:bg-green-700"
                             }`}
                         >
                           {skill.isSafe ? "Mark Unsafe" : "Mark Safe"}
@@ -606,8 +479,8 @@ export default function SkillsManagement() {
                         <button
                           onClick={() => handleSkillAction(skill.id, "toggle-official")}
                           className={`px-3 py-1 text-xs font-medium transition-colors ${skill.isOfficial
-                              ? "bg-gray-600 text-white hover:bg-gray-700"
-                              : "bg-blue-600 text-white hover:bg-blue-700"
+                            ? "bg-gray-600 text-white hover:bg-gray-700"
+                            : "bg-blue-600 text-white hover:bg-blue-700"
                             }`}
                         >
                           {skill.isOfficial ? "Unofficialize" : "Make Official"}
@@ -660,10 +533,7 @@ export default function SkillsManagement() {
                           <h4 className="text-sm font-medium text-text-primary mb-2">Tags</h4>
                           <div className="flex flex-wrap gap-2">
                             {skill.tags.map((tag, index) => (
-                              <span
-                                key={index}
-                                className="inline-flex items-center px-2 py-1 text-xs bg-blue-100 text-blue-800 "
-                              >
+                              <span key={index} className="inline-flex items-center px-2 py-1 text-xs bg-blue-100 text-blue-800">
                                 {tag}
                               </span>
                             ))}
@@ -672,7 +542,7 @@ export default function SkillsManagement() {
 
                         <div>
                           <a
-                            href={skill.repoUrl}
+                            href={skill.repoUrl ?? '#'}
                             target="_blank"
                             rel="noopener noreferrer"
                             className="text-accent hover:text-accent-hover transition-colors text-sm flex items-center gap-1"
@@ -690,7 +560,7 @@ export default function SkillsManagement() {
                         <div className="grid grid-cols-1 gap-2 text-sm">
                           <div className="flex justify-between py-1">
                             <span className="text-text-secondary">Slug:</span>
-                            <code className="text-xs bg-bg-base border border-border  px-2 py-1 font-mono">
+                            <code className="text-xs bg-bg-base border border-border px-2 py-1 font-mono">
                               {skill.slug}
                             </code>
                           </div>

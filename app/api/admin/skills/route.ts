@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { auth } from '@/lib/auth';
 import { db } from '@/lib/db';
 import { headers } from 'next/headers';
+import { Prisma } from '@prisma/client';
 
 export async function GET(request: NextRequest) {
   try {
@@ -102,7 +103,7 @@ export async function PATCH(request: NextRequest) {
       );
     }
 
-    let updateData: any = {};
+    let updateData: Prisma.ListingUpdateInput = {};
     let message = '';
 
     switch (action) {
@@ -129,7 +130,14 @@ export async function PATCH(request: NextRequest) {
         break;
 
       case 'delete':
-        // Permanently delete the listing and cascade will handle related records
+        // Delete associated submissions first (no FK, match by repo coords)
+        await db.submission.deleteMany({
+          where: {
+            repoUrl: listing.repoUrl,
+            repoPath: listing.repoPath ?? undefined,
+          },
+        });
+        // Cascade on Listing handles Votes, Skill, and SkillFiles
         await db.listing.delete({
           where: { id: skillId }
         });

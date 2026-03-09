@@ -13,6 +13,7 @@ export default function SkillDetailClient({ skill }: SkillDetailClientProps) {
   const [upvotes, setUpvotes] = useState(skill.upvotes || 0);
   const [hasUpvoted, setHasUpvoted] = useState(skill.userVote === 1);
   const [selectedFile, setSelectedFile] = useState(skill.files?.[0] || null);
+  const [isFileExpanded, setIsFileExpanded] = useState(false);
   const [installScope, setInstallScope] = useState<'default' | 'global' | 'project'>('default');
 
   // Generate install commands for different scopes
@@ -187,9 +188,9 @@ export default function SkillDetailClient({ skill }: SkillDetailClientProps) {
                 {/* File List Sidebar */}
                 <div className="w-full md:w-48 border-b-2 md:border-b-0 md:border-r-2 border-border flex flex-row md:flex-col bg-bg-base overflow-x-auto">
                   {skill.files.map((file: any) => (
-                    <button 
+                    <button
                       key={file.name}
-                      onClick={() => setSelectedFile(file)}
+                      onClick={() => { setSelectedFile(file); setIsFileExpanded(false); }}
                       className={`flex items-center gap-2 p-3 md:p-4 text-left font-bold text-xs md:text-sm border-r-2 md:border-r-0 md:border-b-2 border-border transition-colors whitespace-nowrap md:whitespace-normal last:border-r-0 md:last:border-b-0 ${
                         selectedFile?.name === file.name 
                           ? 'bg-text-primary text-bg-base' 
@@ -209,13 +210,44 @@ export default function SkillDetailClient({ skill }: SkillDetailClientProps) {
                 </div>
 
                 {/* File Content */}
-                <div className="flex-1 p-4 md:p-6 overflow-x-auto bg-bg-card min-h-[300px] md:min-h-[400px]">
+                <div className="flex-1 overflow-x-auto bg-bg-card min-h-[300px] md:min-h-[400px] relative flex flex-col">
                   {selectedFile ? (
-                    <pre className="text-text-primary font-mono text-xs md:text-sm leading-relaxed whitespace-pre-wrap break-words">
-                      {selectedFile.content}
-                    </pre>
+                    <>
+                      <div className={`p-4 md:p-6 overflow-hidden transition-all duration-300 ${isFileExpanded ? '' : 'max-h-[220px]'}`}>
+                        <pre className="text-text-primary font-mono text-xs md:text-sm leading-relaxed whitespace-pre-wrap break-words">
+                          {selectedFile.content}
+                        </pre>
+                      </div>
+
+                      {/* Gradient + Expand/Collapse button */}
+                      {!isFileExpanded ? (
+                        <div className="absolute bottom-0 left-0 right-0 h-24 bg-gradient-to-t from-bg-card via-bg-card/80 to-transparent flex items-end justify-center pb-4">
+                          <button
+                            onClick={() => setIsFileExpanded(true)}
+                            className="flex items-center gap-2 px-4 py-2 bg-bg-base border-2 border-border text-text-primary text-xs font-bold uppercase tracking-widest hover:bg-accent hover:text-white hover:border-accent transition-colors shadow-[2px_2px_0px_0px_var(--color-border)]"
+                          >
+                            <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2">
+                              <path d="M7 15l5 5 5-5M7 9l5-5 5 5"/>
+                            </svg>
+                            Expand
+                          </button>
+                        </div>
+                      ) : (
+                        <div className="flex justify-center py-4 border-t border-border">
+                          <button
+                            onClick={() => setIsFileExpanded(false)}
+                            className="flex items-center gap-2 px-4 py-2 bg-bg-base border-2 border-border text-text-primary text-xs font-bold uppercase tracking-widest hover:bg-accent hover:text-white hover:border-accent transition-colors shadow-[2px_2px_0px_0px_var(--color-border)]"
+                          >
+                            <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2">
+                              <path d="M7 9l5-5 5 5M7 15l5 5 5-5"/>
+                            </svg>
+                            Collapse
+                          </button>
+                        </div>
+                      )}
+                    </>
                   ) : (
-                    <div className="text-text-muted text-sm font-bold uppercase tracking-widest flex items-center justify-center h-full">
+                    <div className="text-text-muted text-sm font-bold uppercase tracking-widest flex items-center justify-center h-full p-6">
                       Select a file to view
                     </div>
                   )}

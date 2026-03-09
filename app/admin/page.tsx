@@ -28,57 +28,20 @@ export default async function AdminPage() {
     redirect("/");
   }
 
-  // Fetch admin dashboard data
-  const [
-    totalUsers,
-    totalSubmissions,
-    pendingSubmissions,
-    totalListings,
-    recentSubmissions
-  ] = await Promise.all([
-    // Total users count
+  // Fetch admin dashboard stats (submissions fetched client-side via TanStack Query)
+  const [totalUsers, totalSubmissions, totalListings, installStats] = await Promise.all([
     db.user.count(),
-    
-    // Total submissions count
     db.submission.count(),
-    
-    // Pending submissions count
-    db.submission.count({
-      where: { status: "pending" }
-    }),
-    
-    // Total listings count
     db.listing.count(),
-    
-    // Recent submissions for review
-    db.submission.findMany({
-      where: { status: "pending" },
-      include: {
-        user: {
-          select: { name: true, email: true, githubUsername: true }
-        }
-      },
-      orderBy: { createdAt: "desc" },
-      take: 10
-    })
+    db.listing.aggregate({ _sum: { totalInstalls: true, weeklyInstalls: true } }),
   ]);
-
-  // Calculate total installs across all listings
-  const installStats = await db.listing.aggregate({
-    _sum: {
-      totalInstalls: true,
-      weeklyInstalls: true
-    }
-  });
 
   const dashboardData = {
     totalUsers,
     totalSubmissions,
-    pendingSubmissions,
     totalListings,
     totalInstalls: installStats._sum.totalInstalls || 0,
     weeklyInstalls: installStats._sum.weeklyInstalls || 0,
-    recentSubmissions
   };
 
   return (

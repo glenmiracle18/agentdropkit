@@ -23,7 +23,7 @@
 ### API Routes
 - [ ] `app/api/sync-github/route.ts:34` — `listing: any` and `Partial<any>` return type
 - [ ] `app/api/sync-github/route.ts:77` — `(day: any)` in reduce
-- [ ] `app/api/admin/skills/route.ts:105` — `updateData: any`
+- [x] `app/api/admin/skills/route.ts:105` — `updateData: any` (fixed to `Prisma.ListingUpdateInput`)
 - [ ] `app/api/listings/route.ts:59` — `as any` cast on enum map lookup
 - [x] `app/api/analyze-repo/route.ts` — fully rewritten, all `any` removed
 - [ ] `app/api/registry/search/route.ts:14` — `whereClause: any` (use `Prisma.ListingWhereInput`)
@@ -43,12 +43,12 @@
 
 - [ ] `components/submission-form.tsx` — `fetch("/api/analyze-repo")` (POST) → `lib/queries/repo.ts`
 - [ ] `components/submission-form.tsx` — `fetch("/api/submissions")` (POST mutation) → `lib/queries/submissions.ts`
-- [ ] `components/admin-dashboard.tsx` — `fetch("/api/admin/submissions")` → `lib/queries/admin.ts`
-- [ ] `components/skills-management.tsx` — `fetch("/api/admin/skills")` (GET + mutations) → `lib/queries/admin.ts`
+- [x] `components/admin-dashboard.tsx` — `fetch("/api/admin/submissions")` → `lib/queries/admin.ts`
+- [x] `components/skills-management.tsx` — `fetch("/api/admin/skills")` (GET + mutations) → `lib/queries/admin.ts`
 - [ ] `hooks/use-votes.ts` — `fetch("/api/votes")` (POST mutation) → migrate to `useMutation` in `lib/queries/votes.ts`
 
 ---
 
 ## 3. `useEffect` + Fetch (replace with `useQuery`)
 
-- [ ] `components/skills-management.tsx:58-104` — `useEffect(() => { fetchSkills() }, [])` pattern, replace with `useQuery` hook from `lib/queries/admin.ts`
+- [x] `components/skills-management.tsx:58-104` — `useEffect(() => { fetchSkills() }, [])` pattern, replace with `useQuery` hook from `lib/queries/admin.ts`
