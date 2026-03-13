@@ -7,7 +7,7 @@ import { ToastProvider } from "@/components/toast-provider";
 import QueryProvider from "@/components/query-provider";
 
 export const metadata: Metadata = {
-  title: "skills.claude - Prebuilt Claude Skills Directory",
+  title: "AgentDropkit - Prebuilt Claude Skills Directory",
   description:
     "Browse, search, and grab prebuilt skills, MCP servers, and agent tools for Claude and other coding agents.",
 };
@@ -41,9 +41,7 @@ export default function RootLayout({
           >
             <ToastProvider />
             <Navigation />
-            <div className="flex-1">
-              {children}
-            </div>
+            <div className="flex-1">{children}</div>
             <SiteFooter />
           </ThemeProvider>
         </QueryProvider>
