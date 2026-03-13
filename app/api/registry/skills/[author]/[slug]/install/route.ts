@@ -19,15 +19,20 @@ export async function POST(
       );
     }
 
-    // Find the listing
-    const listing = await db.listing.findFirst({
-      where: {
-        authorHandle: author,
-        slug: slug,
-        isVisible: true,
-        isEjected: false,
-      }
+    // Primary lookup: by exact slug (repo name)
+    let listing = await db.listing.findFirst({
+      where: { authorHandle: author, slug: slug, isVisible: true, isEjected: false },
     });
+
+    // Fallback: install command uses slugified skill name, not repo slug
+    if (!listing) {
+      const candidates = await db.listing.findMany({
+        where: { authorHandle: author, isVisible: true, isEjected: false },
+      });
+      listing = candidates.find(
+        (c) => c.name.toLowerCase().replace(/\s+/g, '-') === slug
+      ) ?? null;
+    }
 
     if (!listing) {
       return NextResponse.json(

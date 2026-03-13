@@ -1,6 +1,6 @@
 "use client";
 
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 
 export interface SkillFileData {
   name: string;
@@ -89,6 +89,84 @@ export function useListingDetail(author: string, slug: string) {
     retry: (failureCount, error) => {
       if (error instanceof Error && error.message === "NOT_FOUND") return false;
       return failureCount < 3;
+    },
+  });
+}
+
+// ─── Vote mutation ────────────────────────────────────────────────────────────
+
+interface VotePayload {
+  listingId: string;
+  value: 1 | -1;
+}
+
+interface VoteResponse {
+  voteCount: number;
+  userVote: number | null;
+}
+
+async function postVote(payload: VotePayload): Promise<VoteResponse> {
+  const res = await fetch("/api/votes", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+  });
+  if (res.status === 401) throw new Error("UNAUTHENTICATED");
+  if (!res.ok) throw new Error("Vote failed");
+  return res.json() as Promise<VoteResponse>;
+}
+
+export function useVoteMutation(author: string, slug: string) {
+  const queryClient = useQueryClient();
+  const queryKey = listingDetailQueryKey(author, slug);
+
+  return useMutation<
+    VoteResponse,
+    Error,
+    VotePayload,
+    { previous: ListingDetail | undefined }
+  >({
+    mutationFn: postVote,
+
+    // Optimistic update — immediately reflect the vote in the UI
+    onMutate: async (payload) => {
+      await queryClient.cancelQueries({ queryKey });
+      const previous = queryClient.getQueryData<ListingDetail>(queryKey);
+
+      if (previous) {
+        const isTogglingOff = previous.userVote === payload.value;
+        const newUserVote = isTogglingOff ? null : payload.value;
+
+        let delta = 0;
+        if (isTogglingOff) {
+          delta = -payload.value; // remove vote: upvote removed = -1
+        } else if (previous.userVote != null) {
+          delta = payload.value - previous.userVote; // switch: -1→1 = +2
+        } else {
+          delta = payload.value; // fresh vote
+        }
+
+        queryClient.setQueryData<ListingDetail>(queryKey, {
+          ...previous,
+          upvotes: previous.upvotes + delta,
+          voteCount: previous.voteCount + delta,
+          userVote: newUserVote,
+        });
+      }
+
+      return { previous };
+    },
+
+    // Roll back optimistic update on error
+    onError: (_err, _payload, context) => {
+      if (context?.previous) {
+        queryClient.setQueryData(queryKey, context.previous);
+      }
+    },
+
+    // Always sync with server after settle (success or error)
+    onSettled: () => {
+      void queryClient.invalidateQueries({ queryKey });
     },
   });
 }

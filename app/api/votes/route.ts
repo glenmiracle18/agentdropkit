@@ -2,6 +2,12 @@ import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { auth } from "@/lib/auth";
 import { headers } from "next/headers";
+import { z } from "zod";
+
+const voteBodySchema = z.object({
+  listingId: z.string().min(1),
+  value: z.union([z.literal(1), z.literal(-1)]),
+});
 
 export async function POST(request: NextRequest) {
   try {
@@ -10,96 +16,73 @@ export async function POST(request: NextRequest) {
     });
 
     if (!session?.user) {
-      return NextResponse.json({ error: "Authentication required" }, { status: 401 });
+      return NextResponse.json(
+        { error: "Authentication required" },
+        { status: 401 },
+      );
     }
 
-    const { listingId, direction } = await request.json();
+    const { listingId, value } = voteBodySchema.parse(await request.json());
 
-    if (!listingId || !direction || !["up", "down"].includes(direction)) {
-      return NextResponse.json({ error: "Invalid request data" }, { status: 400 });
+    // Verify listing exists
+    const listing = await db.listing.findUnique({
+      where: { id: listingId },
+      select: { id: true },
+    });
+    if (!listing) {
+      return NextResponse.json({ error: "Listing not found" }, { status: 404 });
     }
 
-    // Check if user already voted on this listing
     const existingVote = await db.vote.findUnique({
-      where: {
-        userId_listingId: {
-          userId: session.user.id,
-          listingId: listingId,
-        },
-      },
+      where: { listingId_userId: { listingId, userId: session.user.id } },
     });
 
     let voteChange = 0;
 
     if (existingVote) {
-      if (existingVote.direction === direction) {
-        // Remove vote (toggle off)
+      if (existingVote.value === value) {
+        // Same direction — toggle off (remove vote)
         await db.vote.delete({
-          where: {
-            userId_listingId: {
-              userId: session.user.id,
-              listingId: listingId,
-            },
-          },
+          where: { listingId_userId: { listingId, userId: session.user.id } },
         });
-        voteChange = direction === "up" ? -1 : 1;
+        voteChange = -value; // upvote removed = -1, downvote removed = +1
       } else {
-        // Change vote direction
+        // Switching direction
         await db.vote.update({
-          where: {
-            userId_listingId: {
-              userId: session.user.id,
-              listingId: listingId,
-            },
-          },
-          data: { direction },
+          where: { listingId_userId: { listingId, userId: session.user.id } },
+          data: { value },
         });
-        voteChange = direction === "up" ? 2 : -2;
+        voteChange = value - existingVote.value; // e.g. 1 - (-1) = +2
       }
     } else {
-      // Create new vote
+      // New vote
       await db.vote.create({
-        data: {
-          userId: session.user.id,
-          listingId: listingId,
-          direction,
-        },
+        data: { listingId, userId: session.user.id, value },
       });
-      voteChange = direction === "up" ? 1 : -1;
+      voteChange = value;
     }
 
-    // Update listing vote count
-    await db.listing.update({
+    // Update listing vote count and return it
+    const updatedListing = await db.listing.update({
       where: { id: listingId },
-      data: {
-        voteCount: {
-          increment: voteChange,
-        },
-      },
-    });
-
-    // Get updated vote count
-    const updatedListing = await db.listing.findUnique({
-      where: { id: listingId },
+      data: { voteCount: { increment: voteChange } },
       select: { voteCount: true },
     });
 
-    // Get user's current vote
-    const userVote = await db.vote.findUnique({
-      where: {
-        userId_listingId: {
-          userId: session.user.id,
-          listingId: listingId,
-        },
-      },
-      select: { direction: true },
+    // Return the caller's current vote (null if removed)
+    const userVoteRecord = await db.vote.findUnique({
+      where: { listingId_userId: { listingId, userId: session.user.id } },
+      select: { value: true },
     });
 
     return NextResponse.json({
-      voteCount: updatedListing?.voteCount || 0,
-      userVote: userVote?.direction || null,
+      voteCount: updatedListing.voteCount,
+      userVote: userVoteRecord?.value ?? null,
     });
   } catch (error) {
+    if (error instanceof z.ZodError) {
+      return NextResponse.json({ error: "Invalid request data" }, { status: 400 });
+    }
     console.error("Vote error:", error);
     return NextResponse.json({ error: "Internal server error" }, { status: 500 });
   }

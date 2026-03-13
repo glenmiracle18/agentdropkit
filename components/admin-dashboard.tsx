@@ -23,14 +23,57 @@ const statusConfig: Record<string, { label: string; bg: string; text: string; bo
   rejected: { label: "Rejected", bg: "bg-red-100",     text: "text-red-800",     border: "border-red-300"    },
 };
 
+interface SyncResult {
+  synced: number;
+  errors: number;
+  total: number;
+}
+
 export default function AdminDashboard({ data }: AdminDashboardProps) {
   const [selectedTab, setSelectedTab] = useState<"overview" | "submissions" | "skills">("overview");
   const [selectedSubmission, setSelectedSubmission] = useState<string | null>(null);
+  const [isSyncing, setIsSyncing] = useState(false);
+  const [syncResult, setSyncResult] = useState<SyncResult | null>(null);
 
   const { data: submissions = [], isLoading: submissionsLoading } = useAdminSubmissions();
   const { mutate: performAction, isPending: actionPending } = useAdminSubmissionAction();
 
   const pendingCount = submissions.filter(s => s.status === "pending").length;
+
+  const handleGitHubSync = async () => {
+    setIsSyncing(true);
+    setSyncResult(null);
+    const loadingToast = sileo.show({
+      title: "Syncing GitHub Stars",
+      description: "Fetching star counts for up to 50 listings...",
+      type: "loading",
+      duration: null,
+    });
+    try {
+      const res = await fetch("/api/admin/sync", { method: "POST" });
+      const result = await res.json() as { success?: boolean; synced?: number; errors?: number; total?: number; error?: string };
+      sileo.dismiss(loadingToast);
+      if (!res.ok || !result.success) {
+        throw new Error(result.error ?? "Sync failed");
+      }
+      const syncData = { synced: result.synced ?? 0, errors: result.errors ?? 0, total: result.total ?? 0 };
+      setSyncResult(syncData);
+      sileo.success({
+        title: "GitHub Stars Synced",
+        description: `Updated ${syncData.synced} of ${syncData.total} listings.${syncData.errors > 0 ? ` ${syncData.errors} failed.` : ""}`,
+        duration: 5000,
+      });
+    } catch (err) {
+      sileo.dismiss(loadingToast);
+      sileo.error({
+        title: "Sync Failed",
+        description: err instanceof Error ? err.message : "Failed to sync GitHub stars.",
+        duration: 6000,
+      });
+    } finally {
+      setIsSyncing(false);
+    }
+  };
 
   const handleSubmissionAction = (submissionId: string, action: "approve" | "reject" | "requeue") => {
     const loadingToast = sileo.show({
@@ -117,6 +160,7 @@ export default function AdminDashboard({ data }: AdminDashboardProps) {
 
       {/* Overview Tab */}
       {selectedTab === "overview" && (
+        <>
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           <div className="bg-bg-surface border border-border border-2 border-dashed border-border p-6">
             <div className="flex items-center justify-between mb-4">
@@ -188,6 +232,40 @@ export default function AdminDashboard({ data }: AdminDashboardProps) {
             <p className="text-sm text-text-secondary">Submissions processed</p>
           </div>
         </div>
+
+        {/* Actions */}
+        <div className="mt-6 bg-bg-surface border-2 border-dashed border-border p-6">
+          <div className="flex items-center justify-between gap-4">
+            <div className="min-w-0">
+              <h3 className="text-base font-mono font-bold text-text-primary uppercase tracking-widest">GitHub Stars Sync</h3>
+              <p className="text-sm text-text-secondary mt-1">
+                {syncResult
+                  ? `Last run: ${syncResult.synced} synced, ${syncResult.errors} failed, ${syncResult.total} total`
+                  : "Syncs up to 50 listings per run, rotating through all listings over time."}
+              </p>
+            </div>
+            <button
+              onClick={handleGitHubSync}
+              disabled={isSyncing}
+              className="flex-shrink-0 flex items-center gap-2 px-4 py-2 bg-accent text-bg-base text-sm font-mono font-bold uppercase tracking-widest hover:bg-accent-hover transition-colors active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              {isSyncing ? (
+                <>
+                  <div className="h-4 w-4 border-2 border-current border-t-transparent rounded-full animate-spin" />
+                  Syncing...
+                </>
+              ) : (
+                <>
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                  </svg>
+                  Sync Stars
+                </>
+              )}
+            </button>
+          </div>
+        </div>
+        </>
       )}
 
       {/* Submissions Tab */}
