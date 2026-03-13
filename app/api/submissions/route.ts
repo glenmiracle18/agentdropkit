@@ -3,90 +3,104 @@ import { db } from "@/lib/db";
 import { auth } from "@/lib/auth";
 import { headers } from "next/headers";
 import { z } from "zod";
-import { SkillParser, type SkillFile } from "@/lib/skill-parser";
-import { Octokit } from '@octokit/rest';
+import { Prisma } from "@prisma/client";
+import { SkillParser, type ParsedSkillSnapshot } from "@/lib/skill-parser";
+import { getRepoCommitSha, fetchSkillMd } from "@/lib/github";
 import { generateInstallCommand } from "@/lib/install-command";
 
+// ---------------------------------------------------------------------------
+// URL helpers
+// ---------------------------------------------------------------------------
+
+/**
+ * Strictly parse a GitHub HTTPS URL.
+ * Returns null for anything that isn't exactly https://github.com/<owner>/<repo>.
+ * Prevents SSRF via subdomain spoofing (github.com.evil.com) or other schemes.
+ */
+function parseGitHubUrl(
+  rawUrl: string,
+): { owner: string; repo: string; normalized: string } | null {
+  let url: URL;
+  try {
+    url = new URL(rawUrl);
+  } catch {
+    return null;
+  }
+  if (url.protocol !== "https:" || url.hostname !== "github.com") return null;
+
+  const parts = url.pathname.replace(/^\//, "").split("/");
+  const owner = parts[0];
+  const repoRaw = parts[1];
+  if (!owner || !repoRaw) return null;
+
+  const repo = repoRaw.replace(/\.git$/, "");
+  // Only allow characters GitHub permits in owner/repo names
+  const validSegment = /^[a-zA-Z0-9_.-]+$/;
+  if (!validSegment.test(owner) || !validSegment.test(repo)) return null;
+
+  return {
+    owner,
+    repo,
+    // Canonical form — used for the duplicate check so variants like
+    // ".git" suffix or trailing slashes don't create duplicate submissions.
+    normalized: `https://github.com/${owner}/${repo}`,
+  };
+}
+
+/** Validate a repo-relative path: no ".." segments, safe characters only. */
+const SAFE_PATH_RE = /^[a-zA-Z0-9/_.-]*$/;
+function isSafePath(p: string): boolean {
+  return SAFE_PATH_RE.test(p) && !p.includes("..");
+}
+
+// ---------------------------------------------------------------------------
+// Zod schema
+// ---------------------------------------------------------------------------
+
 const submissionSchema = z.object({
-  name: z.string().min(1, "Name is required").max(100, "Name must be less than 100 characters"),
-  description: z.string().min(10, "Description must be at least 10 characters").max(1000, "Description must be less than 1000 characters"),
-  longDescription: z.string().min(10, "Long description is required"),
+  name: z
+    .string()
+    .min(1, "Name is required")
+    .max(100, "Name must be less than 100 characters"),
+  description: z
+    .string()
+    .min(10, "Description must be at least 10 characters")
+    .max(1000, "Description must be less than 1000 characters"),
+  longDescription: z
+    .string()
+    .min(10, "Long description is required")
+    .max(10_000, "Long description must be less than 10,000 characters"),
   type: z.enum(["skill", "mcp", "tool"]),
   category: z.string().min(1, "Category is required"),
   repoUrl: z.string().url("Must be a valid URL"),
+  // L-2: repoPath validated below after parsing
   repoPath: z.string().optional(),
-  tags: z.array(z.string()).default([]),
-  authorHandle: z.string().min(1, "Author handle is required"),
-  compatibleAgents: z.array(z.string()).min(1, "At least one compatible agent is required"),
-  triggerWords: z.array(z.string()).default([]),
+  tags: z
+    .array(z.string().max(50))
+    .max(20, "Too many tags")
+    .default([]),
+  authorHandle: z.string().optional().default(""),
+  compatibleAgents: z
+    .array(z.string())
+    .min(1, "At least one compatible agent is required"),
+  triggerWords: z
+    .array(z.string().max(100))
+    .max(30, "Too many trigger phrases")
+    .default([]),
   isOpenSource: z.boolean().default(true),
   license: z.string().min(1, "License is required"),
-  documentation: z.string().url("Must be a valid URL").optional().or(z.literal("")),
+  documentation: z
+    .string()
+    .url("Must be a valid URL")
+    .optional()
+    .or(z.literal("")),
   overview: z.string().optional(),
   selectedSkillPath: z.string().optional(),
 });
 
-// Initialize Octokit
-const octokit = new Octokit({
-  auth: process.env.GITHUB_TOKEN,
-});
-
-// Helper function to collect all files in a skill directory
-async function collectSkillFiles(
-  owner: string,
-  repo: string,
-  dirPath: string,
-  currentPath: string = ''
-): Promise<SkillFile[]> {
-  const skillFiles: SkillFile[] = [];
-  
-  try {
-    const { data: contents } = await octokit.rest.repos.getContent({
-      owner,
-      repo,
-      path: dirPath ? `${dirPath}${currentPath ? `/${currentPath}` : ''}` : currentPath,
-    });
-
-    if (!Array.isArray(contents)) return skillFiles;
-
-    for (const item of contents) {
-      const relativePath = currentPath ? `${currentPath}/${item.name}` : item.name;
-
-      if (item.type === 'file') {
-        try {
-          const { data: fileData } = await octokit.rest.repos.getContent({
-            owner,
-            repo,
-            path: item.path,
-          });
-
-          if ('content' in fileData && fileData.content) {
-            const fileContent = Buffer.from(fileData.content, 'base64').toString('utf-8');
-
-            skillFiles.push({
-              filePath: relativePath,
-              fileName: item.name,
-              fileContent,
-              fileType: SkillParser.determineFileType(relativePath, fileContent),
-              isExecutable: SkillParser.isExecutable(relativePath),
-              fileSize: Buffer.byteLength(fileContent, 'utf8'),
-            });
-          }
-        } catch (fileError) {
-          console.warn(`Could not read file ${item.path}:`, fileError);
-        }
-      } else if (item.type === 'dir') {
-        // Recursively collect files from subdirectories
-        const subFiles = await collectSkillFiles(owner, repo, dirPath, relativePath);
-        skillFiles.push(...subFiles);
-      }
-    }
-  } catch (error) {
-    console.warn(`Could not collect files from ${dirPath}/${currentPath}:`, error);
-  }
-
-  return skillFiles;
-}
+// ---------------------------------------------------------------------------
+// POST /api/submissions
+// ---------------------------------------------------------------------------
 
 export async function POST(request: NextRequest) {
   try {
@@ -95,43 +109,128 @@ export async function POST(request: NextRequest) {
     });
 
     if (!session?.user) {
-      return NextResponse.json({ error: "Authentication required" }, { status: 401 });
+      return NextResponse.json(
+        { error: "Authentication required" },
+        { status: 401 },
+      );
     }
 
     const body = await request.json();
     const validatedData = submissionSchema.parse(body);
 
-    // Create slug from name
-    const slug = validatedData.name
-      .toLowerCase()
-      .replace(/[^a-z0-9\s-]/g, "")
-      .replace(/\s+/g, "-")
-      .replace(/-+/g, "-")
-      .trim();
+    // C-3: Strictly validate that repoUrl is exactly https://github.com/<owner>/<repo>
+    const repoUrlParsed = parseGitHubUrl(validatedData.repoUrl);
+    if (!repoUrlParsed) {
+      return NextResponse.json(
+        {
+          error:
+            "Repository URL must be a valid public GitHub URL (https://github.com/owner/repo)",
+        },
+        { status: 400 },
+      );
+    }
+    const { owner, repo: repoName, normalized: normalizedRepoUrl } = repoUrlParsed;
+
+    // L-2: Validate repoPath against path traversal
+    if (validatedData.repoPath && !isSafePath(validatedData.repoPath)) {
+      return NextResponse.json(
+        { error: "Invalid repository path" },
+        { status: 400 },
+      );
+    }
+    if (
+      validatedData.selectedSkillPath &&
+      validatedData.selectedSkillPath !== "root" &&
+      !isSafePath(validatedData.selectedSkillPath)
+    ) {
+      return NextResponse.json(
+        { error: "Invalid skill path" },
+        { status: 400 },
+      );
+    }
+
+    // authorHandle is always the repo owner — never the submitter's account
+    const authorHandle = owner;
 
     // Generate install command
     const installCommand = generateInstallCommand({
-      repoUrl: validatedData.repoUrl,
-      authorHandle: validatedData.authorHandle,
-      skillName: validatedData.name
+      repoUrl: normalizedRepoUrl,
+      authorHandle,
+      skillName: validatedData.name,
     });
 
-    // Check if a submission with this repo URL and path already exists
+    // M-2: Use normalized URL for the duplicate check so ".git" suffix variants
+    // and other equivalent forms are treated as the same submission.
     const existingSubmission = await db.submission.findFirst({
       where: {
-        repoUrl: validatedData.repoUrl,
-        repoPath: validatedData.repoPath || null,
+        repoUrl: normalizedRepoUrl,
+        repoPath: validatedData.repoPath ?? null,
       },
     });
 
     if (existingSubmission) {
       return NextResponse.json(
-        { error: "A submission with this repository URL and path already exists" },
-        { status: 409 }
+        {
+          error:
+            "A submission with this repository URL and path already exists",
+        },
+        { status: 409 },
       );
     }
 
-    // Create submission
+    // Build a lean SkillSubmissionRef for skill-type submissions.
+    //
+    // We only make two GitHub API calls:
+    //   1. getRepoCommitSha — pins the exact commit being submitted
+    //   2. fetchSkillMd    — validates SKILL.md exists + extracts metadata
+    //
+    // NO file contents are stored here. The full file tree is fetched from
+    // GitHub at approval time (using the stored commitSha) and written into
+    // SkillFile records. This keeps Submission rows small regardless of how
+    // many scripts/files a skill contains.
+    let parsedSkillData: ParsedSkillSnapshot | null = null;
+    let skillDataWarning: string | null = null;
+
+    if (validatedData.type === "skill") {
+      const skillPath =
+        !validatedData.selectedSkillPath ||
+        validatedData.selectedSkillPath === "root"
+          ? ""
+          : validatedData.selectedSkillPath;
+
+      try {
+        // Run both calls concurrently — independent of each other
+        const [commitSha, skillMdContent] = await Promise.all([
+          getRepoCommitSha(owner, repoName),
+          fetchSkillMd(owner, repoName, skillPath),
+        ]);
+
+        if (skillMdContent) {
+          const { metadata } = SkillParser.parseSkillMarkdown(skillMdContent);
+          const triggerKeywords = SkillParser.extractTriggerKeywords(
+            metadata.description,
+          );
+
+          parsedSkillData = {
+            commitSha: commitSha ?? "",
+            skillPath,
+            metadata: {
+              name: String(metadata.name),
+              description: String(metadata.description),
+              triggerKeywords,
+            },
+          };
+        } else {
+          skillDataWarning =
+            "No SKILL.md found at the selected path — skill files will not appear after approval.";
+        }
+      } catch (err) {
+        console.warn("Failed to validate SKILL.md during submission:", err);
+        skillDataWarning =
+          "Could not reach GitHub to validate SKILL.md. Files will be fetched at approval time.";
+      }
+    }
+
     const submission = await db.submission.create({
       data: {
         name: validatedData.name,
@@ -139,113 +238,45 @@ export async function POST(request: NextRequest) {
         longDescription: validatedData.longDescription,
         type: validatedData.type,
         category: validatedData.category,
-        repoUrl: validatedData.repoUrl,
-        repoPath: validatedData.repoPath || null,
-        installCommand: installCommand,
+        repoUrl: normalizedRepoUrl,
+        repoPath: validatedData.repoPath ?? null,
+        installCommand,
         tags: validatedData.tags,
-        authorHandle: validatedData.authorHandle,
+        authorHandle,
         compatibleAgents: validatedData.compatibleAgents,
         triggerWords: validatedData.triggerWords,
         isOpenSource: validatedData.isOpenSource,
         license: validatedData.license,
-        documentation: validatedData.documentation || null,
-        overview: validatedData.overview || null,
+        documentation: validatedData.documentation ?? null,
+        overview: validatedData.overview ?? null,
         status: "pending",
         userId: session.user.id,
+        parsedSkillData:
+          (parsedSkillData as unknown as Prisma.InputJsonValue) ??
+          Prisma.DbNull,
       },
     });
 
-    // If this is a skill submission with a selected skill path, parse and store the skill
-    if (validatedData.type === 'skill' && validatedData.selectedSkillPath) {
-      try {
-        const [, owner, repoName] = validatedData.repoUrl.match(/github\.com\/([^\/]+)\/([^\/]+)/) || [];
-        const repo = repoName?.replace(/\.git$/, '');
-        
-        if (owner && repo) {
-          // Re-analyze the repository to get skill data
-          const skillPath = validatedData.selectedSkillPath === 'root' ? '' : validatedData.selectedSkillPath;
-          const skillFiles = await collectSkillFiles(owner, repo, skillPath);
-          
-          // Get SKILL.md content
-          const skillMdPath = skillPath ? `${skillPath}/SKILL.md` : 'SKILL.md';
-          const skillMdFile = skillFiles.find(f => f.fileName.toLowerCase() === 'skill.md');
-          
-          if (skillMdFile) {
-            const parsedSkill = SkillParser.parseSkill(skillMdFile.fileContent, skillFiles);
-            
-            // Create Listing for the skill
-            const listing = await db.listing.create({
-              data: {
-                slug,
-                name: validatedData.name,
-                type: 'skill',
-                description: validatedData.description,
-                longDescription: validatedData.longDescription,
-                authorHandle: validatedData.authorHandle,
-                repoUrl: validatedData.repoUrl,
-                repoPath: validatedData.repoPath,
-                installCommand: installCommand,
-                category: validatedData.category,
-                tags: validatedData.tags,
-                compatibleAgents: validatedData.compatibleAgents,
-                triggerWords: validatedData.triggerWords,
-                isOpenSource: validatedData.isOpenSource,
-                license: validatedData.license,
-                documentation: validatedData.documentation,
-                overview: validatedData.overview,
-                files: JSON.stringify(skillFiles),
-              },
-            });
-
-            // Create Skill record
-            const skill = await db.skill.create({
-              data: {
-                listingId: listing.id,
-                name: parsedSkill.metadata.name,
-                description: parsedSkill.metadata.description,
-                instructions: parsedSkill.instructions,
-                fileStructure: parsedSkill.fileStructure,
-                triggerKeywords: parsedSkill.triggerKeywords,
-              },
-            });
-
-            // Create SkillFile records
-            await db.skillFile.createMany({
-              data: skillFiles.map(file => ({
-                skillId: skill.id,
-                filePath: file.filePath,
-                fileName: file.fileName,
-                fileContent: file.fileContent,
-                fileType: file.fileType,
-                isExecutable: file.isExecutable,
-                fileSize: file.fileSize,
-              })),
-            });
-          }
-        }
-      } catch (skillError) {
-        console.error('Failed to store skill data:', skillError);
-        // Don't fail the submission if skill parsing fails
-      }
-    }
-
-    return NextResponse.json({
-      id: submission.id,
-      message: "Submission created successfully",
-    }, { status: 201 });
-
+    return NextResponse.json(
+      {
+        id: submission.id,
+        message: "Submission created successfully",
+        ...(skillDataWarning ? { skillDataWarning } : {}),
+      },
+      { status: 201 },
+    );
   } catch (error) {
     if (error instanceof z.ZodError) {
       return NextResponse.json(
-        { error: "Invalid data", details: error.errors },
-        { status: 400 }
+        { error: "Invalid data", details: error.issues },
+        { status: 400 },
       );
     }
 
     console.error("Submission error:", error);
     return NextResponse.json(
       { error: "Internal server error" },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }

@@ -6,7 +6,7 @@ import SubmissionsList from "@/components/submissions-list";
 import SubmitHeaderIcon from "@/components/submit-header-icon";
 
 interface SubmitPageClientProps {
-  user: { id: string; name: string; email: string; image?: string | null };
+  user: { id: string; name: string; email: string; image?: string | null; githubUsername: string | null };
   isNew: boolean;
 }
 

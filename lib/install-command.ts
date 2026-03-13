@@ -4,7 +4,7 @@
  */
 
 export interface InstallCommandOptions {
-  repoUrl: string;
+  repoUrl?: string;
   authorHandle: string;
   slug?: string;
   skillName?: string;
@@ -23,32 +23,25 @@ export function generateInstallCommand({
   slug,
   skillName,
 }: InstallCommandOptions): string {
-  // Clean up repository URL to extract meaningful parts. remove https frontmatter and the .git at the end if it exists
-  const cleanUrl = repoUrl.replace(/^https?:\/\//, "").replace(/\.git$/, "");
+  // Extract repo info only when a URL is provided
+  const cleanUrl = repoUrl
+    ? repoUrl.replace(/^https?:\/\//, "").replace(/\.git$/, "")
+    : "";
+  const repoInfo = cleanUrl ? extractRepositoryInfo(cleanUrl) : null;
 
-  // Extract repository info from different URL formats
-  let repoInfo = extractRepositoryInfo(cleanUrl);
-
-  // Generate the skill identifier for the CLI command
+  // Generate the skill identifier for the CLI command.
+  // Priority: explicit skillName > slug > repo URL > fallback
   let skillIdentifier: string;
 
-  if (repoInfo) {
-    // Use repository-based identifier: owner/repo-name
-    skillIdentifier = `${repoInfo.owner}/${repoInfo.name}`;
+  if (skillName) {
+    // Skill name from SKILL.md metadata takes priority: authorHandle/skill-name
+    skillIdentifier = `${authorHandle}/${skillName.toLowerCase().replace(/\s+/g, "-")}`;
   } else if (slug) {
-    // Use author/slug format
     skillIdentifier = `${authorHandle}/${slug}`;
-  } else if (skillName) {
-    // For single-name skills, check if it's a common name that doesn't need author prefix
-    const commonSkills = ["coding-standards", "git-workflows", "web-utils"];
-    if (commonSkills.includes(skillName.toLowerCase().replace(/\s+/g, "-"))) {
-      skillIdentifier = skillName.toLowerCase().replace(/\s+/g, "-");
-    } else {
-      skillIdentifier = `${authorHandle}/${skillName.toLowerCase().replace(/\s+/g, "-")}`;
-    }
+  } else if (repoInfo) {
+    skillIdentifier = `${repoInfo.owner}/${repoInfo.name}`;
   } else {
-    // Fallback to author/repo format
-    skillIdentifier = `${authorHandle}/skill`;
+    skillIdentifier = authorHandle;
   }
 
   return `npx agentdropkit add ${skillIdentifier}`;
@@ -147,21 +140,20 @@ export function getSkillDisplayName({
   slug,
   skillName,
 }: InstallCommandOptions): string {
-  const repoInfo = extractRepositoryInfo(
-    repoUrl.replace(/^https?:\/\//, "").replace(/\.git$/, ""),
-  );
+  if (skillName) {
+    return `${authorHandle}/${skillName.toLowerCase().replace(/\s+/g, "-")}`;
+  }
 
+  if (slug) {
+    return `${authorHandle}/${slug}`;
+  }
+
+  const cleanUrl = repoUrl
+    ? repoUrl.replace(/^https?:\/\//, "").replace(/\.git$/, "")
+    : "";
+  const repoInfo = cleanUrl ? extractRepositoryInfo(cleanUrl) : null;
   if (repoInfo) {
     return `${repoInfo.owner}/${repoInfo.name}`;
-  } else if (slug) {
-    return `${authorHandle}/${slug}`;
-  } else if (skillName) {
-    const formattedName = skillName.toLowerCase().replace(/\s+/g, "-");
-    const commonSkills = ["coding-standards", "git-workflows", "web-utils"];
-    if (commonSkills.includes(formattedName)) {
-      return formattedName;
-    }
-    return `${authorHandle}/${formattedName}`;
   }
 
   return `${authorHandle}/skill`;

@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { Octokit } from '@octokit/rest';
+import { auth } from '@/lib/auth';
+import { headers } from 'next/headers';
 import { SkillParser, type SkillFile } from '@/lib/skill-parser';
 
 // Increase serverless function timeout on Vercel
@@ -10,6 +12,25 @@ const octokit = new Octokit({
 });
 
 const MAX_FILES_PER_SKILL = 30;
+const MAX_SKILLS = 10; // cap how many skill dirs we process per repo
+const MAX_FILE_BYTES = 100_000; // 100 KB per file — skip anything larger
+
+// Strictly parse a GitHub HTTPS URL.
+// Returns null for anything that isn't exactly https://github.com/<owner>/<repo>.
+function parseGitHubUrl(rawUrl: string): { owner: string; repo: string } | null {
+  let url: URL;
+  try { url = new URL(rawUrl); } catch { return null; }
+  if (url.protocol !== 'https:' || url.hostname !== 'github.com') return null;
+  const parts = url.pathname.replace(/^\//, '').split('/');
+  const owner = parts[0];
+  const repoRaw = parts[1];
+  if (!owner || !repoRaw) return null;
+  const repo = repoRaw.replace(/\.git$/, '');
+  // Only allow characters GitHub permits in owner/repo names
+  const valid = /^[a-zA-Z0-9_.-]+$/;
+  if (!valid.test(owner) || !valid.test(repo)) return null;
+  return { owner, repo };
+}
 
 interface RepoAnalysis {
   folders: string[];
@@ -22,6 +43,13 @@ interface RepoAnalysis {
 }
 
 export async function POST(request: NextRequest) {
+  // C-1: Require authentication — prevents unauthenticated callers from
+  // exhausting the server's GitHub token rate limit.
+  const session = await auth.api.getSession({ headers: await headers() });
+  if (!session?.user) {
+    return NextResponse.json({ error: 'Authentication required' }, { status: 401 });
+  }
+
   try {
     let body: { repoUrl?: string };
     try {
@@ -35,18 +63,19 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Repository URL is required' }, { status: 400 });
     }
 
-    const githubUrlPattern = /github\.com\/([^/]+)\/([^/]+)/;
-    const match = repoUrl.match(githubUrlPattern);
-    if (!match) {
-      return NextResponse.json({ error: 'Invalid GitHub repository URL' }, { status: 400 });
+    // C-3: Strict URL validation — must be exactly https://github.com/<owner>/<repo>
+    const parsed = parseGitHubUrl(repoUrl);
+    if (!parsed) {
+      return NextResponse.json(
+        { error: 'URL must be a valid public GitHub repository (https://github.com/owner/repo)' },
+        { status: 400 },
+      );
     }
-
-    const [, owner, repoName] = match;
-    const repo = repoName.replace(/\.git$/, '');
+    const { owner, repo } = parsed;
 
     // 1. Fetch repo metadata + full recursive tree in parallel — 2 API calls total
     let repoData: Awaited<ReturnType<typeof octokit.rest.repos.get>>['data'] | null = null;
-    let treeItems: { path?: string; type?: string }[] = [];
+    let treeItems: { path?: string; type?: string; size?: number }[] = [];
 
     try {
       const [repoResult, treeResult] = await Promise.all([
@@ -80,9 +109,12 @@ export async function POST(request: NextRequest) {
           item.path?.toLowerCase().endsWith('/skill.md'))
     );
 
+    // C-2: Cap how many skill directories we process per request to bound API usage.
+    const skillMdItemsCapped = skillMdItems.slice(0, MAX_SKILLS);
+
     // 4. For each SKILL.md, fetch its content + direct sibling files in parallel
     const skillEntries = await Promise.all(
-      skillMdItems.map(async skillMd => {
+      skillMdItemsCapped.map(async skillMd => {
         const skillPath = skillMd.path!;
         const skillDir = skillPath.includes('/')
           ? skillPath.substring(0, skillPath.lastIndexOf('/'))
@@ -91,6 +123,8 @@ export async function POST(request: NextRequest) {
         // Only files that live directly inside this skill directory (non-recursive)
         const siblingItems = treeItems.filter(item => {
           if (item.type !== 'blob' || !item.path) return false;
+          // H-4: Skip large files before fetching to avoid memory/storage bloat
+          if ((item.size ?? 0) > MAX_FILE_BYTES) return false;
           if (skillDir === '') {
             return !item.path.includes('/');
           }
@@ -132,8 +166,8 @@ export async function POST(request: NextRequest) {
         if (!skillMdFile) return null;
 
         try {
-          const parsed = SkillParser.parseSkill(skillMdFile.fileContent, skillFiles);
-          return [skillDir || 'root', parsed] as const;
+          const parsedSkill = SkillParser.parseSkill(skillMdFile.fileContent, skillFiles);
+          return [skillDir || 'root', parsedSkill] as const;
         } catch (e) {
           console.warn(`Failed to parse skill at ${skillDir}:`, e);
           return null;
@@ -157,10 +191,11 @@ export async function POST(request: NextRequest) {
     return NextResponse.json(analysis);
 
   } catch (error: unknown) {
+    // M-5: Log internally, return a generic message to avoid leaking internals
     console.error('Repository analysis error:', error);
     return NextResponse.json(
       {
-        error: error instanceof Error ? error.message : 'Failed to analyze repository',
+        error: 'Repository analysis failed. Please try again.',
         folders: [],
         readme: null,
         license: null,

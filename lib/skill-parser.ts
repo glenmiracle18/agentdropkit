@@ -1,17 +1,17 @@
-import matter from 'gray-matter';
-import path from 'path';
+import matter from "gray-matter";
+import path from "path";
 
 export interface SkillMetadata {
   name: string;
   description: string;
-  [key: string]: any;
+  [key: string]: unknown;
 }
 
 export interface SkillFile {
   filePath: string;
   fileName: string;
   fileContent: string;
-  fileType: 'markdown' | 'script' | 'resource' | 'template';
+  fileType: "markdown" | "script" | "resource" | "template";
   isExecutable: boolean;
   fileSize: number;
 }
@@ -20,74 +20,134 @@ export interface ParsedSkill {
   metadata: SkillMetadata;
   instructions: string;
   files: SkillFile[];
-  fileStructure: Record<string, any>;
+  fileStructure: Record<string, unknown>;
+  fileTree: string[];
   triggerKeywords: string[];
 }
+
+/**
+ * Lean reference stored in Submission.parsedSkillData at submission time.
+ *
+ * Intentionally contains NO file contents — only enough to:
+ *   1. Know which commit was submitted (commitSha — for pinned approval fetch)
+ *   2. Know where in the repo the skill lives (skillPath)
+ *   3. Pre-populate listing metadata without a second GitHub round-trip
+ *
+ * Full file contents are fetched from GitHub at approval time using commitSha
+ * and stored in SkillFile records. This keeps the Submission row tiny.
+ */
+export interface SkillSubmissionRef {
+  /** SHA of the HEAD commit at the time of submission. Used as the `ref`
+   *  parameter when fetching files during approval so the approved version
+   *  is deterministic even if the repo has been updated since. */
+  commitSha: string;
+  /** Path of the skill directory within the repo. Empty string = repo root. */
+  skillPath: string;
+  metadata: {
+    name: string;
+    description: string;
+    triggerKeywords: string[];
+  };
+}
+
+/**
+ * Type alias for the value stored in Submission.parsedSkillData.
+ * Points to the lean SkillSubmissionRef — never the full ParsedSkill.
+ */
+export type ParsedSkillSnapshot = SkillSubmissionRef;
 
 export class SkillParser {
   /**
    * Parse SKILL.md content and extract metadata + instructions
    */
-  static parseSkillMarkdown(content: string): { metadata: SkillMetadata; instructions: string } {
+  static parseSkillMarkdown(content: string): {
+    metadata: SkillMetadata;
+    instructions: string;
+  } {
     const parsed = matter(content);
-    
+
     if (!parsed.data.name || !parsed.data.description) {
-      throw new Error('SKILL.md must contain name and description in YAML frontmatter');
+      throw new Error(
+        "SKILL.md must contain name and description in YAML frontmatter",
+      );
     }
 
     // Validate name format
     if (!/^[a-z0-9-]+$/.test(parsed.data.name)) {
-      throw new Error('Skill name must contain only lowercase letters, numbers, and hyphens');
+      throw new Error(
+        "Skill name must contain only lowercase letters, numbers, and hyphens",
+      );
     }
 
     if (parsed.data.name.length > 64) {
-      throw new Error('Skill name must be 64 characters or less');
-    }
-
-    // Check for reserved words
-    const reservedWords = ['anthropic', 'claude'];
-    if (reservedWords.some(word => parsed.data.name.includes(word))) {
-      throw new Error(`Skill name cannot contain reserved words: ${reservedWords.join(', ')}`);
+      throw new Error("Skill name must be 64 characters or less");
     }
 
     if (parsed.data.description.length > 1024) {
-      throw new Error('Skill description must be 1024 characters or less');
+      throw new Error("Skill description must be 1024 characters or less");
     }
 
     return {
       metadata: parsed.data as SkillMetadata,
-      instructions: parsed.content.trim()
+      instructions: parsed.content.trim(),
     };
   }
 
   /**
    * Determine file type based on extension and content
    */
-  static determineFileType(filePath: string, content: string): SkillFile['fileType'] {
+  static determineFileType(
+    filePath: string,
+    content: string,
+  ): SkillFile["fileType"] {
     const ext = path.extname(filePath).toLowerCase();
     const fileName = path.basename(filePath).toLowerCase();
 
     // Markdown files
-    if (ext === '.md') {
-      return 'markdown';
+    if (ext === ".md") {
+      return "markdown";
     }
 
     // Script files
-    const scriptExtensions = ['.py', '.js', '.ts', '.sh', '.bat', '.ps1', '.rb', '.go', '.java'];
+    const scriptExtensions = [
+      ".py",
+      ".js",
+      ".ts",
+      ".sh",
+      ".bat",
+      ".ps1",
+      ".rb",
+      ".go",
+      ".java",
+    ];
     if (scriptExtensions.includes(ext)) {
-      return 'script';
+      return "script";
     }
 
     // Template/config files
-    const templateExtensions = ['.json', '.yaml', '.yml', '.xml', '.toml', '.ini', '.env'];
-    const templateFiles = ['dockerfile', 'makefile', 'requirements.txt', 'package.json', 'composer.json'];
-    
+    const templateExtensions = [
+      ".json",
+      ".yaml",
+      ".yml",
+      ".xml",
+      ".toml",
+      ".ini",
+      ".env",
+    ];
+    const templateFiles = [
+      "dockerfile",
+      "makefile",
+      "requirements.txt",
+      "package.json",
+      "composer.json",
+    ];
+
     if (templateExtensions.includes(ext) || templateFiles.includes(fileName)) {
-      return 'template';
+      return "template";
     }
 
     // Everything else is a resource
-    return 'resource';
+    return "resource";
   }
 
   /**
@@ -95,7 +155,16 @@ export class SkillParser {
    */
   static isExecutable(filePath: string): boolean {
     const ext = path.extname(filePath).toLowerCase();
-    const executableExtensions = ['.py', '.js', '.ts', '.sh', '.bat', '.ps1', '.rb', '.go'];
+    const executableExtensions = [
+      ".py",
+      ".js",
+      ".ts",
+      ".sh",
+      ".bat",
+      ".ps1",
+      ".rb",
+      ".go",
+    ];
     return executableExtensions.includes(ext);
   }
 
@@ -104,12 +173,16 @@ export class SkillParser {
    */
   static extractTriggerKeywords(description: string): string[] {
     // Extract meaningful words from description
-    const keywords = description
-      .toLowerCase()
-      // Remove common stop words
-      .replace(/\b(the|a|an|and|or|but|in|on|at|to|for|of|with|by|use|when|this|that|these|those|is|are|was|were|be|been|have|has|had|do|does|did|will|would|could|should|may|might)\b/g, ' ')
-      // Extract words that are 3+ characters
-      .match(/\b[a-z]{3,}\b/g) || [];
+    const keywords =
+      description
+        .toLowerCase()
+        // Remove common stop words
+        .replace(
+          /\b(the|a|an|and|or|but|in|on|at|to|for|of|with|by|use|when|this|that|these|those|is|are|was|were|be|been|have|has|had|do|does|did|will|would|could|should|may|might)\b/g,
+          " ",
+        )
+        // Extract words that are 3+ characters
+        .match(/\b[a-z]{3,}\b/g) || [];
 
     // Remove duplicates and return
     return [...new Set(keywords)];
@@ -118,28 +191,32 @@ export class SkillParser {
   /**
    * Build file structure mapping for JSON storage
    */
-  static buildFileStructure(files: SkillFile[]): Record<string, any> {
-    const structure: Record<string, any> = {};
+  static buildFileStructure(
+    files: SkillFile[],
+  ): Record<string, unknown> {
+    // Interface (not type alias) is required for recursive self-reference
+    interface TreeNode extends Record<string, TreeNode | { type: string; executable: boolean; size: number }> {}
+    const structure: TreeNode = {};
 
     for (const file of files) {
-      const parts = file.filePath.split('/');
+      const parts = file.filePath.split("/");
       let current = structure;
 
-      // Build nested structure
+      // Build nested directory structure
       for (let i = 0; i < parts.length - 1; i++) {
         const part = parts[i];
-        if (!current[part]) {
-          current[part] = {};
+        if (!current[part] || typeof current[part] !== "object") {
+          current[part] = {} as TreeNode;
         }
-        current = current[part];
+        current = current[part] as TreeNode;
       }
 
-      // Add file info
+      // Leaf: file metadata (no content)
       const fileName = parts[parts.length - 1];
       current[fileName] = {
         type: file.fileType,
         executable: file.isExecutable,
-        size: file.fileSize
+        size: file.fileSize,
       };
     }
 
@@ -152,12 +229,12 @@ export class SkillParser {
   static buildFileTree(files: SkillFile[]): string[] {
     // Group files by directory
     const tree = new Map<string, string[]>();
-    
-    files.forEach(file => {
-      const parts = file.filePath.split('/');
-      const dirPath = parts.slice(0, -1).join('/') || '.';
+
+    files.forEach((file) => {
+      const parts = file.filePath.split("/");
+      const dirPath = parts.slice(0, -1).join("/") || ".";
       const fileName = parts[parts.length - 1];
-      
+
       if (!tree.has(dirPath)) {
         tree.set(dirPath, []);
       }
@@ -167,25 +244,33 @@ export class SkillParser {
     // Build tree structure as array of strings
     const result: string[] = [];
     const sortedDirs = Array.from(tree.keys()).sort();
-    
+
     sortedDirs.forEach((dir, index) => {
-      if (dir === '.') {
+      if (dir === ".") {
         // Root files
-        tree.get(dir)!.sort().forEach((file, fileIndex) => {
-          const isLast = fileIndex === tree.get(dir)!.length - 1 && index === sortedDirs.length - 1;
-          result.push(`${isLast ? '└── ' : '├── '}${file}`);
-        });
+        tree
+          .get(dir)!
+          .sort()
+          .forEach((file, fileIndex) => {
+            const isLast =
+              fileIndex === tree.get(dir)!.length - 1 &&
+              index === sortedDirs.length - 1;
+            result.push(`${isLast ? "└── " : "├── "}${file}`);
+          });
       } else {
         // Directory
         const isLastDir = index === sortedDirs.length - 1;
-        result.push(`${isLastDir ? '└── ' : '├── '}${dir}/`);
-        
+        result.push(`${isLastDir ? "└── " : "├── "}${dir}/`);
+
         // Files in directory
-        tree.get(dir)!.sort().forEach((file, fileIndex) => {
-          const isLastFile = fileIndex === tree.get(dir)!.length - 1;
-          const prefix = isLastDir ? '    ' : '│   ';
-          result.push(`${prefix}${isLastFile ? '└── ' : '├── '}${file}`);
-        });
+        tree
+          .get(dir)!
+          .sort()
+          .forEach((file, fileIndex) => {
+            const isLastFile = fileIndex === tree.get(dir)!.length - 1;
+            const prefix = isLastDir ? "    " : "│   ";
+            result.push(`${prefix}${isLastFile ? "└── " : "├── "}${file}`);
+          });
       }
     });
 
@@ -197,9 +282,11 @@ export class SkillParser {
    */
   static validateSkillStructure(files: SkillFile[]): void {
     // Must have SKILL.md
-    const hasSkillMd = files.some(f => f.fileName.toLowerCase() === 'skill.md');
+    const hasSkillMd = files.some(
+      (f) => f.fileName.toLowerCase() === "skill.md",
+    );
     if (!hasSkillMd) {
-      throw new Error('Skill must contain a SKILL.md file');
+      throw new Error("Skill must contain a SKILL.md file");
     }
 
     // Check for suspicious files
@@ -210,11 +297,11 @@ export class SkillParser {
       /\.dylib$/i,
       /password/i,
       /secret/i,
-      /api[_-]?key/i
+      /api[_-]?key/i,
     ];
 
     for (const file of files) {
-      if (suspiciousPatterns.some(pattern => pattern.test(file.filePath))) {
+      if (suspiciousPatterns.some((pattern) => pattern.test(file.filePath))) {
         console.warn(`Potentially suspicious file detected: ${file.filePath}`);
       }
     }
@@ -223,7 +310,10 @@ export class SkillParser {
   /**
    * Parse a complete skill from GitHub repository analysis
    */
-  static parseSkill(skillMdContent: string, allFiles: SkillFile[]): ParsedSkill {
+  static parseSkill(
+    skillMdContent: string,
+    allFiles: SkillFile[],
+  ): ParsedSkill {
     // Parse the main SKILL.md
     const { metadata, instructions } = this.parseSkillMarkdown(skillMdContent);
 
@@ -231,11 +321,11 @@ export class SkillParser {
     this.validateSkillStructure(allFiles);
 
     // Process all files
-    const processedFiles = allFiles.map(file => ({
+    const processedFiles = allFiles.map((file) => ({
       ...file,
       fileType: this.determineFileType(file.filePath, file.fileContent),
       isExecutable: this.isExecutable(file.filePath),
-      fileSize: Buffer.byteLength(file.fileContent, 'utf8')
+      fileSize: Buffer.byteLength(file.fileContent, "utf8"),
     }));
 
     // Build file structure
@@ -253,7 +343,7 @@ export class SkillParser {
       files: processedFiles,
       fileStructure,
       fileTree,
-      triggerKeywords
+      triggerKeywords,
     };
   }
 }

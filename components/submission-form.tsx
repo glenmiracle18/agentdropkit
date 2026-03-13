@@ -18,10 +18,16 @@ interface SubmissionFormProps {
   user: User;
 }
 
+interface DetectedSkill {
+  metadata: { name: string; description: string };
+  instructions: string;
+  files: unknown[];
+  fileTree?: string[];
+}
+
 interface FormData {
   name: string;
-  description: string;
-  longDescription: string;
+  description: string; // auto-filled from skill metadata; not shown in UI
   type: "skill" | "mcp" | "tool";
   category: string;
   repoUrl: string;
@@ -103,7 +109,6 @@ function RotatingAnalysisMessage() {
   const [msgIndex, setMsgIndex] = useState(0);
   const [exiting, setExiting] = useState(false);
 
-  // Schedule the next exit after a random 3–5 s window
   useEffect(() => {
     if (exiting) return;
     const delay = 3000 + Math.random() * 2000;
@@ -111,7 +116,6 @@ function RotatingAnalysisMessage() {
     return () => clearTimeout(t);
   }, [msgIndex, exiting]);
 
-  // After the exit animation plays, swap the message and start the enter
   useEffect(() => {
     if (!exiting) return;
     const t = setTimeout(() => {
@@ -146,8 +150,9 @@ export default function SubmissionForm({ user }: SubmissionFormProps) {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
-  const [availableFolders, setAvailableFolders] = useState<string[]>([]);
-  const [detectedSkills, setDetectedSkills] = useState<Record<string, any>>({});
+  const [detectedSkills, setDetectedSkills] = useState<
+    Record<string, DetectedSkill>
+  >({});
   const [selectedSkillPath, setSelectedSkillPath] = useState<string>("");
   const [currentTriggerWord, setCurrentTriggerWord] = useState("");
   const [currentTag, setCurrentTag] = useState("");
@@ -155,14 +160,12 @@ export default function SubmissionForm({ user }: SubmissionFormProps) {
   const [formData, setFormData] = useState<FormData>({
     name: "",
     description: "",
-    longDescription: "",
     type: "skill",
     category: "Development",
     repoUrl: "",
     repoPath: "",
     tags: [],
-    authorHandle:
-      user.githubUsername || user.name?.toLowerCase().replace(/\s+/g, "") || "",
+    authorHandle: "",
     compatibleAgents: [],
     triggerWords: [],
     isOpenSource: true,
@@ -171,18 +174,15 @@ export default function SubmissionForm({ user }: SubmissionFormProps) {
     overview: "",
   });
 
-  // Generate install command based on current form data
+  // Install command — only after a skill has been selected and named
   const generatedInstallCommand = useMemo(() => {
-    if (!formData.repoUrl || !formData.authorHandle) {
+    if (!selectedSkillPath || !formData.authorHandle || !formData.name)
       return "";
-    }
-    
     return generateInstallCommand({
-      repoUrl: formData.repoUrl,
       authorHandle: formData.authorHandle,
-      skillName: formData.name || undefined
+      skillName: formData.name,
     });
-  }, [formData.repoUrl, formData.authorHandle, formData.name]);
+  }, [selectedSkillPath, formData.authorHandle, formData.name]);
 
   const handleInputChange = (
     e: React.ChangeEvent<
@@ -207,38 +207,35 @@ export default function SubmissionForm({ user }: SubmissionFormProps) {
   };
 
   const addTriggerWord = (word: string) => {
-    const trimmedWord = word.trim();
-    if (trimmedWord && !formData.triggerWords.includes(trimmedWord)) {
+    const trimmed = word.trim();
+    if (trimmed && !formData.triggerWords.includes(trimmed)) {
       setFormData((prev) => ({
         ...prev,
-        triggerWords: [...prev.triggerWords, trimmedWord],
+        triggerWords: [...prev.triggerWords, trimmed],
       }));
     }
     setCurrentTriggerWord("");
   };
 
-  const removeTriggerWord = (wordToRemove: string) => {
+  const removeTriggerWord = (w: string) => {
     setFormData((prev) => ({
       ...prev,
-      triggerWords: prev.triggerWords.filter((word) => word !== wordToRemove),
+      triggerWords: prev.triggerWords.filter((x) => x !== w),
     }));
   };
 
   const addTag = (tag: string) => {
-    const trimmedTag = tag.trim();
-    if (trimmedTag && !formData.tags.includes(trimmedTag)) {
-      setFormData((prev) => ({
-        ...prev,
-        tags: [...prev.tags, trimmedTag],
-      }));
+    const trimmed = tag.trim();
+    if (trimmed && !formData.tags.includes(trimmed)) {
+      setFormData((prev) => ({ ...prev, tags: [...prev.tags, trimmed] }));
     }
     setCurrentTag("");
   };
 
-  const removeTag = (tagToRemove: string) => {
+  const removeTag = (t: string) => {
     setFormData((prev) => ({
       ...prev,
-      tags: prev.tags.filter((tag) => tag !== tagToRemove),
+      tags: prev.tags.filter((x) => x !== t),
     }));
   };
 
@@ -246,9 +243,12 @@ export default function SubmissionForm({ user }: SubmissionFormProps) {
     if (e.key === "," || e.key === "Enter") {
       e.preventDefault();
       addTag(currentTag);
-    } else if (e.key === "Backspace" && currentTag === "" && formData.tags.length > 0) {
-      const lastTag = formData.tags[formData.tags.length - 1];
-      removeTag(lastTag);
+    } else if (
+      e.key === "Backspace" &&
+      currentTag === "" &&
+      formData.tags.length > 0
+    ) {
+      removeTag(formData.tags[formData.tags.length - 1]);
     }
   };
 
@@ -256,14 +256,15 @@ export default function SubmissionForm({ user }: SubmissionFormProps) {
     const pasted = e.clipboardData.getData("text");
     if (!pasted.includes(",")) return;
     e.preventDefault();
-    pasted.split(",").map((t) => t.trim()).filter(Boolean).forEach(addTag);
+    pasted
+      .split(",")
+      .map((t) => t.trim())
+      .filter(Boolean)
+      .forEach(addTag);
   };
 
   const handleTriggerWordInput = (e: React.KeyboardEvent<HTMLInputElement>) => {
-    if (e.key === ",") {
-      e.preventDefault();
-      addTriggerWord(currentTriggerWord);
-    } else if (e.key === "Enter") {
+    if (e.key === "," || e.key === "Enter") {
       e.preventDefault();
       addTriggerWord(currentTriggerWord);
     } else if (
@@ -271,98 +272,95 @@ export default function SubmissionForm({ user }: SubmissionFormProps) {
       currentTriggerWord === "" &&
       formData.triggerWords.length > 0
     ) {
-      // Remove last trigger word if input is empty and backspace is pressed
-      const lastWord = formData.triggerWords[formData.triggerWords.length - 1];
-      removeTriggerWord(lastWord);
+      removeTriggerWord(
+        formData.triggerWords[formData.triggerWords.length - 1],
+      );
     }
   };
 
-  const handleTriggerWordPaste = (e: React.ClipboardEvent<HTMLInputElement>) => {
+  const handleTriggerWordPaste = (
+    e: React.ClipboardEvent<HTMLInputElement>,
+  ) => {
     const pasted = e.clipboardData.getData("text");
     if (!pasted.includes(",")) return;
     e.preventDefault();
-    pasted.split(",").map((t) => t.trim()).filter(Boolean).forEach(addTriggerWord);
+    pasted
+      .split(",")
+      .map((t) => t.trim())
+      .filter(Boolean)
+      .forEach(addTriggerWord);
   };
 
-  const analyzeRepository = useCallback(async (repoUrl: string) => {
-    if (!repoUrl || !repoUrl.includes("github.com")) {
-      setAvailableFolders([]);
-      return;
-    }
+  const selectSkill = (skillPath: string, skill: DetectedSkill) => {
+    setSelectedSkillPath(skillPath);
+    setFormData((prev) => ({
+      ...prev,
+      name: skill.metadata.name || prev.name,
+      // description is the hidden short-form field sent to the API
+      description: skill.metadata.description || prev.description,
+      // overview is the user-visible textarea — pre-filled from SKILL.md frontmatter
+      overview: skill.metadata.description || prev.overview,
+      repoPath: skillPath === "root" ? "" : skillPath,
+    }));
+  };
 
-    setIsAnalyzing(true);
+  // H-5: analyzeRepository accepts an AbortSignal so stale in-flight requests
+  // can be cancelled when the URL changes before the response arrives.
+  const analyzeRepository = useCallback(
+    async (repoUrl: string, signal?: AbortSignal) => {
+      if (!repoUrl || !repoUrl.includes("github.com")) {
+        setDetectedSkills({});
+        return;
+      }
 
-    // Show persistent loading toast
-    const loadingToast = sileo.show({
-      title: "Analyzing Repository",
-      description: <RotatingAnalysisMessage />,
-      type: "loading",
-      duration: null, // persistent
-    });
-
-    try {
-      const response = await fetch("/api/analyze-repo", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({ repoUrl }),
+      setIsAnalyzing(true);
+      const loadingToast = sileo.show({
+        title: "Analyzing Repository",
+        description: <RotatingAnalysisMessage />,
+        type: "loading",
+        duration: null,
       });
 
-      if (!response.ok) {
-        let errorMessage = "Failed to analyze repository";
-        try {
-          const errorData = await response.json();
-          errorMessage = errorData.error || errorMessage;
-        } catch (jsonError) {
-          console.warn("Failed to parse error response as JSON:", jsonError);
-          errorMessage = `HTTP ${response.status}: ${response.statusText}`;
-        }
-        throw new Error(errorMessage);
-      }
-
-      let analysis;
       try {
-        analysis = await response.json();
-      } catch (jsonError) {
-        console.error("Failed to parse analysis response as JSON:", jsonError);
-        throw new Error("Invalid response format from repository analysis");
-      }
+        const response = await fetch("/api/analyze-repo", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ repoUrl }),
+          signal,
+        });
 
-      setAvailableFolders(analysis.folders || []);
-      setDetectedSkills(analysis.skills || {});
+        if (!response.ok) {
+          let errorMessage = "Failed to analyze repository";
+          try {
+            const errorData = (await response.json()) as { error?: string };
+            errorMessage = errorData.error ?? errorMessage;
+          } catch {
+            errorMessage = `HTTP ${response.status}: ${response.statusText}`;
+          }
+          throw new Error(errorMessage);
+        }
 
-      // Check if skills were detected
-      const skillPaths = Object.keys(analysis.skills || {});
-      let skillsMessage = "";
+        const analysis = (await response.json()) as {
+          folders?: string[];
+          skills?: Record<string, DetectedSkill>;
+          license?: string;
+        };
 
-      if (skillPaths.length > 0) {
-        skillsMessage = `, ${skillPaths.length} skill${skillPaths.length === 1 ? "" : "s"}`;
+        const skills = analysis.skills ?? {};
+        setDetectedSkills(skills);
 
-        // If only one skill detected, auto-select it
+        const skillPaths = Object.keys(skills);
+        const skillsMessage =
+          skillPaths.length > 0
+            ? `, ${skillPaths.length} skill${skillPaths.length === 1 ? "" : "s"}`
+            : "";
+
+        // Auto-select and auto-populate if exactly one skill found
         if (skillPaths.length === 1) {
           const skillPath = skillPaths[0];
-          const skill = analysis.skills[skillPath];
-          setSelectedSkillPath(skillPath);
-
-          // Auto-populate form with skill metadata
-          setFormData((prev) => ({
-            ...prev,
-            name: skill.metadata.name || prev.name,
-            description: skill.metadata.description || prev.description,
-            longDescription: skill.instructions || prev.longDescription,
-            triggerWords: prev.triggerWords,
-            repoPath: skillPath === "root" ? "" : skillPath,
-            license:
-              analysis.license && analysis.license !== "NOASSERTION"
-                ? analysis.license
-                : prev.license,
-          }));
+          selectSkill(skillPath, skills[skillPath]);
         }
-      }
 
-      // Auto-populate basic fields if no skills detected
-      if (skillPaths.length === 0) {
         setFormData((prev) => ({
           ...prev,
           license:
@@ -370,45 +368,67 @@ export default function SubmissionForm({ user }: SubmissionFormProps) {
               ? analysis.license
               : prev.license,
         }));
+
+        sileo.dismiss(loadingToast);
+        sileo.success({
+          title: "Repository Analysis Complete",
+          description: `Found ${analysis.folders?.length ?? 0} folders${skillsMessage}${analysis.license ? `, license: ${analysis.license}` : ""}.`,
+          duration: 4000,
+        });
+      } catch (err) {
+        // AbortError means the URL changed and a newer request superseded this
+        // one — silently discard rather than showing a spurious error toast.
+        if (err instanceof Error && err.name === "AbortError") return;
+        const message =
+          err instanceof Error
+            ? err.message
+            : "Could not analyze repository. Please verify the URL is correct and the repository is accessible.";
+        sileo.dismiss(loadingToast);
+        sileo.error({
+          title: "Repository Analysis Failed",
+          description: message,
+          duration: 6000,
+        });
+        setDetectedSkills({});
+      } finally {
+        setIsAnalyzing(false);
       }
+    },
+    // selectSkill only calls stable setters — safe to omit from deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [],
+  );
 
-      // Dismiss loading toast and show success
-      sileo.dismiss(loadingToast);
-      sileo.success({
-        title: "Repository Analysis Complete",
-        description: `Found ${analysis.folders?.length || 0} folders${skillsMessage}${analysis.license ? `, license: ${analysis.license}` : ""}.`,
-        duration: 4000,
-      });
-    } catch (error: any) {
-      console.error("Repository analysis failed:", error);
-
-      // Dismiss loading toast and show error
-      sileo.dismiss(loadingToast);
-      sileo.error({
-        title: "Repository Analysis Failed",
-        description:
-          error.message ||
-          "Could not analyze repository. Please verify the URL is correct and the repository is accessible.",
-        duration: 6000,
-      });
-      setAvailableFolders([]);
-    } finally {
-      setIsAnalyzing(false);
+  // H-5: Debounce in a useEffect so cleanup (clearTimeout + abort) actually runs.
+  // Event handler return values are ignored by React; only useEffect returns work.
+  useEffect(() => {
+    const url = formData.repoUrl;
+    if (!url || !url.includes("github.com")) {
+      setDetectedSkills({});
+      return;
     }
-  }, []);
+
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => {
+      void analyzeRepository(url, controller.signal);
+    }, 1000);
+
+    return () => {
+      clearTimeout(timeoutId);
+      controller.abort();
+    };
+  }, [formData.repoUrl, analyzeRepository]);
 
   const handleRepoUrlChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { value } = e.target;
     handleInputChange(e);
 
-    // Debounce the analysis
-    const timeoutId = setTimeout(() => {
-      if (value && value.includes("github.com")) {
-        analyzeRepository(value);
-      }
-    }, 1000);
-
-    return () => clearTimeout(timeoutId);
+    // Auto-extract repo owner as authorHandle from the URL
+    const ownerMatch = value.match(/github\.com\/([^\/]+)\/([^\/]+)/);
+    if (ownerMatch) {
+      setFormData((prev) => ({ ...prev, authorHandle: ownerMatch[1] }));
+    }
+    // Debounced analysis is handled by the useEffect above
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -416,7 +436,6 @@ export default function SubmissionForm({ user }: SubmissionFormProps) {
     setIsSubmitting(true);
     setError(null);
 
-    // Validate compatible agents
     if (formData.compatibleAgents.length === 0) {
       setError("Please select at least one compatible agent.");
       setIsSubmitting(false);
@@ -432,28 +451,31 @@ export default function SubmissionForm({ user }: SubmissionFormProps) {
       title: "Processing submission...",
       description: "Validating your skill and creating submission.",
       type: "loading",
-      duration: null, // persistent until dismissed
+      duration: null,
     });
 
     try {
+      // description is auto-filled from skill metadata; fall back to first
+      // 200 chars of overview if somehow still empty
+      const description =
+        formData.description ||
+        formData.overview.slice(0, 200).replace(/\n/g, " ").trim();
+
       const response = await fetch("/api/submissions", {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           ...formData,
-          triggerWords: formData.triggerWords,
-          selectedSkillPath: selectedSkillPath,
+          description,
+          longDescription: formData.overview, // overview covers the long-form content
+          selectedSkillPath,
         }),
       });
 
       if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || "Failed to submit");
+        const errorData = (await response.json()) as { error?: string };
+        throw new Error(errorData.error ?? "Failed to submit");
       }
-
-      const result = await response.json();
 
       sileo.dismiss(submittingToast);
       sileo.success({
@@ -463,14 +485,12 @@ export default function SubmissionForm({ user }: SubmissionFormProps) {
         duration: 3000,
       });
 
-      // Invalidate cache so submissions list refetches, then navigate
       await queryClient.invalidateQueries({ queryKey: submissionsQueryKey });
       setTimeout(() => router.push("/submit"), 2000);
     } catch (err) {
       const errorMessage =
         err instanceof Error ? err.message : "Failed to submit";
       setError(errorMessage);
-
       sileo.dismiss(submittingToast);
       sileo.error({
         title: "Submission failed",
@@ -482,15 +502,21 @@ export default function SubmissionForm({ user }: SubmissionFormProps) {
     }
   };
 
+  const skillPaths = Object.keys(detectedSkills);
+  const selectedSkill = selectedSkillPath
+    ? detectedSkills[selectedSkillPath]
+    : null;
+
   return (
     <div className="bg-bg-surface border-2 border-dashed border-border p-8">
       <form onSubmit={handleSubmit} className="space-y-12">
-        {/* Repository Information */}
-        <div className="space-y-8">
+        {/* ── 1. REPOSITORY ─────────────────────────────────────────────── */}
+        <div className="space-y-6">
           <h2 className="text-xl font-semibold text-text-primary font-mono">
-            Repository Information
+            Repository
           </h2>
 
+          {/* Repo URL */}
           <div>
             <label
               htmlFor="repoUrl"
@@ -510,7 +536,7 @@ export default function SubmissionForm({ user }: SubmissionFormProps) {
                 placeholder="https://github.com/username/repo"
               />
               {isAnalyzing && (
-                <div className="absolute right-3 top-1/2 transform -translate-y-1/2">
+                <div className="absolute right-3 top-1/2 -translate-y-1/2">
                   <svg
                     className="animate-spin h-4 w-4 text-accent"
                     fill="none"
@@ -523,139 +549,150 @@ export default function SubmissionForm({ user }: SubmissionFormProps) {
                       r="10"
                       stroke="currentColor"
                       strokeWidth="4"
-                    ></circle>
+                    />
                     <path
                       className="opacity-75"
                       fill="currentColor"
                       d="m4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
-                    ></path>
+                    />
                   </svg>
                 </div>
               )}
             </div>
-            <p className="text-xs text-text-dim mt-1">
-              GitHub repository URL - will auto-scan for folders and content
+            <p className="sr-only">
+              GitHub repository URL — will auto-scan for skills and content
             </p>
           </div>
 
-          {/* Auto-Generated Install Command */}
-          {generatedInstallCommand && (
+          {/* Author (read-only, right next to repo URL) */}
+          {formData.authorHandle && (
             <div>
-              <label className="block text-sm font-medium text-text-primary mb-2">
-                Installation Command
-                <span className="text-xs text-text-dim font-normal ml-2">
-                  (Auto-generated)
-                </span>
+              <label
+                htmlFor="authorHandle"
+                className="block text-sm font-medium text-text-primary mb-2"
+              >
+                Author
               </label>
-              <div className="relative">
-                <input
-                  type="text"
-                  value={generatedInstallCommand}
-                  readOnly
-                  className="w-full px-3 py-2 bg-bg-inset border border-border text-text-primary font-mono text-sm focus:border-accent focus:outline-none cursor-text"
-                  onClick={(e) => e.currentTarget.select()}
-                />
-                <button
-                  type="button"
-                  onClick={() => {
-                    navigator.clipboard.writeText(generatedInstallCommand);
-                    sileo.success({
-                      title: "Copied!",
-                      description: "Installation command copied to clipboard",
-                      duration: 2000,
-                    });
-                  }}
-                  className="absolute right-2 top-1/2 transform -translate-y-1/2 p-1.5 text-text-dim hover:text-text-primary transition-colors"
-                  title="Copy to clipboard"
-                >
-                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"></path>
-                  </svg>
-                </button>
-              </div>
-              <p className="text-xs text-text-dim mt-1">
-                This command will be used to install your skill via the AgentDropkit CLI
+              <input
+                type="text"
+                id="authorHandle"
+                name="authorHandle"
+                readOnly
+                value={formData.authorHandle}
+                className="w-full px-3 py-2 bg-bg-deep border border-border rounded-sm text-text-dim cursor-not-allowed opacity-70"
+              />
+              <p className="sr-only">
+                Auto-extracted from the repo URL — this is the GitHub owner, not
+                your account
               </p>
             </div>
           )}
 
-          {/* Detected Skills Selection */}
-          {Object.keys(detectedSkills).length > 0 && (
-            <div className="mt-6">
-              <label className="block text-sm font-medium text-text-primary mb-2">
-                Detected Skills
-              </label>
-              <div className="space-y-3">
-                {Object.entries(detectedSkills).map(
-                  ([skillPath, skill]: [string, any]) => (
-                    <div
-                      key={skillPath}
-                      className={`p-4 border rounded-sm cursor-pointer transition-colors ${selectedSkillPath === skillPath
-                        ? "border-accent bg-accent/5"
-                        : "border-border hover:border-accent/50"
-                        }`}
-                      onClick={() => {
-                        setSelectedSkillPath(skillPath);
-                        setFormData((prev) => ({
-                          ...prev,
-                          name: skill.metadata.name || prev.name,
-                          description:
-                            skill.metadata.description || prev.description,
-                          longDescription:
-                            skill.instructions || prev.longDescription,
-                          triggerWords: prev.triggerWords,
-                          repoPath: skillPath === "root" ? "" : skillPath,
-                        }));
-                      }}
-                    >
-                      <div className="flex items-start justify-between">
-                        <div className="flex-1 min-w-0">
-                          <h4 className="font-medium text-text-primary truncate">
-                            {skill.metadata.name}
-                          </h4>
-                          <p className="text-sm text-text-secondary mt-1 truncate overflow-hidden whitespace-nowrap">
-                            {skill.metadata.description}
-                          </p>
-                          <p className="text-xs text-text-dim mt-1 truncate">
-                            Path: {skillPath === "root" ? "/" : `/${skillPath}`}{" "}
-                            • {skill.files.length} files
-                          </p>
-                        </div>
-                        {selectedSkillPath === skillPath && (
-                          <div className="text-accent text-sm font-medium ml-4">
-                            Selected
-                          </div>
-                        )}
-                      </div>
-
-                      {/* File Tree */}
-                      {selectedSkillPath === skillPath && skill.fileTree && (
-                        <div className="mt-4 p-3 bg-bg-deep rounded border">
-                          <h5 className="text-xs font-medium text-text-secondary mb-2">
-                            File Structure:
-                          </h5>
-                          <pre className="text-xs text-text-dim font-mono leading-relaxed">
-                            {skill.fileTree.join("\n")}
-                          </pre>
-                        </div>
-                      )}
-                    </div>
-                  ),
+          {/* Detected skills — collapses to selected card once a skill is chosen */}
+          {skillPaths.length > 0 && (
+            <div>
+              <div className="flex items-center justify-between mb-2">
+                <label className="block text-sm font-medium text-text-primary">
+                  {selectedSkillPath
+                    ? "Selected Skill"
+                    : `Detected Skills (${skillPaths.length})`}
+                </label>
+                {selectedSkillPath && (
+                  <button
+                    type="button"
+                    onClick={() => setSelectedSkillPath("")}
+                    className="text-xs text-text-dim hover:text-accent transition-colors underline underline-offset-2"
+                  >
+                    Change
+                  </button>
                 )}
               </div>
-              <p className="text-xs text-text-dim mt-2">
-                Select a skill to auto-populate form fields with its metadata
-              </p>
+
+              {selectedSkill ? (
+                /* Compact selected-skill card */
+                <div className="p-4 border border-accent bg-accent/5 rounded-sm">
+                  <div className="flex items-start justify-between gap-4">
+                    <div className="min-w-0">
+                      <h4 className="font-medium text-text-primary truncate">
+                        {selectedSkill.metadata.name}
+                      </h4>
+                      <p className="text-sm text-text-secondary mt-0.5 truncate">
+                        {selectedSkill.metadata.description}
+                      </p>
+                      <p className="text-xs text-text-dim mt-1">
+                        {selectedSkillPath === "root"
+                          ? "/"
+                          : `/${selectedSkillPath}`}
+                        {" · "}
+                        {(selectedSkill.files as unknown[]).length} files
+                      </p>
+                    </div>
+                    <span className="shrink-0 text-xs font-semibold text-accent uppercase tracking-widest mt-0.5">
+                      ✓ Selected
+                    </span>
+                  </div>
+
+                  {selectedSkill.fileTree && (
+                    <div className="mt-3 p-3 bg-bg-deep rounded border border-border">
+                      <p className="text-xs font-medium text-text-secondary mb-1.5">
+                        File structure
+                      </p>
+                      <pre className="text-xs text-text-dim font-mono leading-relaxed">
+                        {selectedSkill.fileTree.join("\n")}
+                      </pre>
+                    </div>
+                  )}
+                </div>
+              ) : (
+                /* Full list — shown when no skill is selected yet */
+                <div className="space-y-2">
+                  {skillPaths.map((skillPath) => {
+                    const skill = detectedSkills[skillPath];
+                    return (
+                      <div
+                        key={skillPath}
+                        className="p-4 border border-border hover:border-accent/50 rounded-sm cursor-pointer transition-colors"
+                        onClick={() => selectSkill(skillPath, skill)}
+                      >
+                        <div className="flex items-start justify-between gap-4">
+                          <div className="min-w-0">
+                            <h4 className="font-medium text-text-primary truncate">
+                              {skill.metadata.name}
+                            </h4>
+                            <p className="text-sm text-text-secondary mt-0.5 truncate">
+                              {skill.metadata.description}
+                            </p>
+                            <p className="text-xs text-text-dim mt-1">
+                              {skillPath === "root" ? "/" : `/${skillPath}`}
+                              {" · "}
+                              {(skill.files as unknown[]).length} files
+                            </p>
+                          </div>
+                          <span className="shrink-0 text-xs text-text-dim mt-0.5">
+                            Select →
+                          </span>
+                        </div>
+                      </div>
+                    );
+                  })}
+                  <p className="sr-only">
+                    Click a skill to auto-populate the form fields below
+                  </p>
+                </div>
+              )}
             </div>
           )}
         </div>
 
-        {/* Basic Information */}
-        <div className="space-y-8">
+        <div className="border-t border-dashed border-border/50" />
+
+        {/* ── 2. SKILL DETAILS ──────────────────────────────────────────── */}
+        <div className="space-y-6">
           <h2 className="text-xl font-semibold text-text-primary font-mono">
-            Basic Information
+            Skill Details
           </h2>
 
+          {/* Name + Type */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <div>
               <label
@@ -698,51 +735,56 @@ export default function SubmissionForm({ user }: SubmissionFormProps) {
             </div>
           </div>
 
-          <div className="border-t border-dashed border-border/50 pt-6"></div>
+          {/* Install command — only visible after skill selection */}
+          {generatedInstallCommand && (
+            <div>
+              <label className="block text-sm font-medium text-text-primary mb-2">
+                Install Command
+                <span className="text-xs text-text-dim font-normal ml-2">
+                  (auto-generated)
+                </span>
+              </label>
+              <div className="relative">
+                <input
+                  type="text"
+                  value={generatedInstallCommand}
+                  readOnly
+                  className="w-full px-3 py-2 bg-bg-inset border border-border text-text-primary font-mono text-sm focus:border-accent focus:outline-none cursor-text"
+                  onClick={(e) => e.currentTarget.select()}
+                />
+                <button
+                  type="button"
+                  onClick={() => {
+                    navigator.clipboard.writeText(generatedInstallCommand);
+                    sileo.success({
+                      title: "Copied!",
+                      description: "Install command copied to clipboard",
+                      duration: 2000,
+                    });
+                  }}
+                  className="absolute right-2 top-1/2 -translate-y-1/2 p-1.5 text-text-dim hover:text-text-primary transition-colors"
+                  title="Copy to clipboard"
+                >
+                  <svg
+                    className="w-4 h-4"
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth="2"
+                      d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"
+                    />
+                  </svg>
+                </button>
+              </div>
+            </div>
+          )}
 
-          <div>
-            <label
-              htmlFor="description"
-              className="block text-sm font-medium text-text-primary mb-2"
-            >
-              Short Description *
-            </label>
-            <textarea
-              id="description"
-              name="description"
-              required
-              rows={3}
-              value={formData.description}
-              onChange={handleInputChange}
-              className="w-full px-3 py-2 bg-bg-deep border border-border rounded-sm text-text-primary placeholder-text-dim focus:border-accent focus:outline-none resize-vertical"
-              placeholder="1-2 sentences that summarize what your skill does"
-            />
-          </div>
-
-          <div className="border-t border-dashed border-border/50 pt-6"></div>
-
-          <div>
-            <label
-              htmlFor="longDescription"
-              className="block text-sm font-medium text-text-primary mb-2"
-            >
-              Detailed Description *
-            </label>
-            <textarea
-              id="longDescription"
-              name="longDescription"
-              required
-              rows={6}
-              value={formData.longDescription}
-              onChange={handleInputChange}
-              className="w-full px-3 py-2 bg-bg-deep border border-border rounded-sm text-text-primary placeholder-text-dim focus:border-accent focus:outline-none resize-vertical"
-              placeholder="Detailed description of features, use cases, and benefits..."
-            />
-          </div>
-
-          <div className="border-t border-dashed border-border/50 pt-6"></div>
-
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+          {/* Category + Tags */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <div>
               <label
                 htmlFor="category"
@@ -758,9 +800,9 @@ export default function SubmissionForm({ user }: SubmissionFormProps) {
                 onChange={handleInputChange}
                 className="w-full px-3 py-2 bg-bg-deep border border-border rounded-sm text-text-primary focus:border-accent focus:outline-none"
               >
-                {categories.map((category) => (
-                  <option key={category} value={category}>
-                    {category}
+                {categories.map((c) => (
+                  <option key={c} value={c}>
+                    {c}
                   </option>
                 ))}
               </select>
@@ -772,16 +814,16 @@ export default function SubmissionForm({ user }: SubmissionFormProps) {
               </label>
               <div className="border border-border rounded-sm p-2 bg-bg-deep focus-within:border-accent min-h-[44px]">
                 <div className="flex flex-wrap gap-2 items-center">
-                  {formData.tags.map((tag, index) => (
+                  {formData.tags.map((tag, i) => (
                     <div
-                      key={`${tag}-${index}`}
-                      className="group inline-flex items-center gap-1 px-2 py-1 bg-bg-card border border-border rounded text-xs font-medium text-text-primary hover:border-accent transition-all duration-200 animate-in fade-in slide-in-from-bottom-1"
+                      key={`${tag}-${i}`}
+                      className="group inline-flex items-center gap-1 px-2 py-1 bg-bg-card border border-border rounded text-xs font-medium text-text-primary hover:border-accent transition-all duration-200"
                     >
                       <span>{tag}</span>
                       <button
                         type="button"
                         onClick={() => removeTag(tag)}
-                        className="opacity-0 group-hover:opacity-100 transition-all duration-150 ml-1 p-0.5 hover:bg-red-500 hover:text-white rounded-full hover:scale-110"
+                        className="opacity-0 group-hover:opacity-100 transition-all duration-150 ml-1 p-0.5 hover:bg-red-500 hover:text-white rounded-full"
                         title="Remove tag"
                       >
                         <svg
@@ -812,41 +854,53 @@ export default function SubmissionForm({ user }: SubmissionFormProps) {
                   />
                 </div>
               </div>
-              <p className="text-xs text-text-dim mt-2">
-                Type tags like "python", "api", "automation" and press comma or enter to add them.
-              </p>
+              <p className="sr-only">e.g. python, api, automation</p>
             </div>
           </div>
+        </div>
 
-          <div className="border-t border-dashed border-border/50 pt-6"></div>
+        <div className="border-t border-dashed border-border/50" />
+
+        {/* ── 3. DESCRIPTION ────────────────────────────────────────────── */}
+        <div className="space-y-6">
+          <h2 className="text-xl font-semibold text-text-primary font-mono">
+            Description
+          </h2>
 
           <div>
             <label
-              htmlFor="authorHandle"
+              htmlFor="overview"
               className="block text-sm font-medium text-text-primary mb-2"
             >
-              Author Handle *
+              Overview *
             </label>
-            <input
-              type="text"
-              id="authorHandle"
-              name="authorHandle"
+            <textarea
+              id="overview"
+              name="overview"
               required
-              value={formData.authorHandle}
+              rows={4}
+              value={formData.overview}
               onChange={handleInputChange}
-              className="w-full px-3 py-2 bg-bg-deep border border-border rounded-sm text-text-primary placeholder-text-dim focus:border-accent focus:outline-none"
-              placeholder="your-username"
+              className="w-full px-3 py-2 bg-bg-deep border border-border rounded-sm text-text-primary placeholder-text-dim focus:border-accent focus:outline-none resize-none"
+              placeholder="A short paragraph describing what this skill does and when to use it."
             />
-            <p className="text-xs text-text-dim mt-1 sr-only">
-              Your username or handle for attribution
+            <p className="sr-only">
+              Plain text only. Keep it concise — 2 to 4 sentences.
             </p>
           </div>
+        </div>
 
-          <div className="border-t border-dashed border-border/50 pt-6"></div>
+        <div className="border-t border-dashed border-border/50" />
+
+        {/* ── 4. AGENTS & TRIGGERS ──────────────────────────────────────── */}
+        <div className="space-y-6">
+          <h2 className="text-xl font-semibold text-text-primary font-mono">
+            Agents &amp; Triggers
+          </h2>
 
           {/* Compatible Agents */}
           <div>
-            <label className="block text-sm font-medium text-text-primary mb-4">
+            <label className="block text-sm font-medium text-text-primary mb-3">
               Compatible Agents *
             </label>
             <div className="flex flex-wrap gap-2">
@@ -856,10 +910,11 @@ export default function SubmissionForm({ user }: SubmissionFormProps) {
                   type="button"
                   onClick={() => handleAgentToggle(agent)}
                   disabled={isAnalyzing}
-                  className={`px-3 py-2 text-xs font-bold uppercase tracking-widest border-2 transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed ${formData.compatibleAgents.includes(agent)
-                    ? "bg-accent text-white border-accent shadow-[2px_2px_0px_0px_var(--color-text-primary)] hover:shadow-[4px_4px_0px_0px_var(--color-text-primary)] hover:-translate-x-[2px] hover:-translate-y-[2px]"
-                    : "bg-bg-base text-text-primary border-border hover:bg-bg-card hover:border-accent"
-                    }`}
+                  className={`px-3 py-2 text-xs font-bold uppercase tracking-widest border-2 transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed ${
+                    formData.compatibleAgents.includes(agent)
+                      ? "bg-accent text-white border-accent shadow-[2px_2px_0px_0px_var(--color-text-primary)] hover:shadow-[4px_4px_0px_0px_var(--color-text-primary)] hover:-translate-x-[2px] hover:-translate-y-[2px]"
+                      : "bg-bg-base text-text-primary border-border hover:bg-bg-card hover:border-accent"
+                  }`}
                 >
                   <span className="flex items-center gap-2">
                     {formData.compatibleAgents.includes(agent) && (
@@ -876,18 +931,9 @@ export default function SubmissionForm({ user }: SubmissionFormProps) {
                 </button>
               ))}
             </div>
-            <p className="text-xs text-text-dim mt-3 sr-only">
-              Select all AI agents that are compatible with your {formData.type}
-              . At least one agent must be selected.
-              {formData.compatibleAgents.length > 0 && (
-                <span className="block mt-1 text-accent font-medium">
-                  Selected: {formData.compatibleAgents.join(", ")}
-                </span>
-              )}
-            </p>
           </div>
 
-          <div className="border-t border-dashed border-border/50 pt-6"></div>
+          <div className="border-t border-dashed border-border/50" />
 
           {/* Trigger Phrases */}
           <div>
@@ -896,17 +942,17 @@ export default function SubmissionForm({ user }: SubmissionFormProps) {
             </label>
             <div className="border border-border rounded-sm p-2 bg-bg-deep focus-within:border-accent min-h-[44px]">
               <div className="flex flex-wrap gap-2 items-center">
-                {formData.triggerWords.map((word, index) => (
+                {formData.triggerWords.map((word, i) => (
                   <div
-                    key={`${word}-${index}`}
-                    className="group inline-flex items-center gap-1 px-2 py-1 bg-bg-card border border-border rounded text-xs font-medium text-text-primary hover:border-accent transition-all duration-200 animate-in fade-in slide-in-from-bottom-1"
+                    key={`${word}-${i}`}
+                    className="group inline-flex items-center gap-1 px-2 py-1 bg-bg-card border border-border rounded text-xs font-medium text-text-primary hover:border-accent transition-all duration-200"
                   >
                     <span>{word}</span>
                     <button
                       type="button"
                       onClick={() => removeTriggerWord(word)}
-                      className="opacity-0 group-hover:opacity-100 transition-all duration-150 ml-1 p-0.5 hover:bg-red-500 hover:text-white rounded-full hover:scale-110"
-                      title="Remove trigger phrase"
+                      className="opacity-0 group-hover:opacity-100 transition-all duration-150 ml-1 p-0.5 hover:bg-red-500 hover:text-white rounded-full"
+                      title="Remove"
                     >
                       <svg
                         className="w-3 h-3"
@@ -930,26 +976,28 @@ export default function SubmissionForm({ user }: SubmissionFormProps) {
                   className="flex-1 min-w-[120px] bg-transparent border-none outline-none text-text-primary placeholder-text-dim"
                   placeholder={
                     formData.triggerWords.length === 0
-                      ? "Type trigger phrases and press comma or enter..."
+                      ? "e.g. navigate page, fill form, take screenshot..."
                       : "Add more..."
                   }
                 />
               </div>
             </div>
-            <p className="text-xs text-text-dim mt-2">
-              Type action phrases like "navigate page", "fill forms", "take
-              screenshot" and press comma or enter to add them.
+            <p className="sr-only">
+              Phrases that describe when Claude should use this skill. Press
+              comma or enter to add.
             </p>
           </div>
         </div>
 
-        {/* License Information */}
-        <div className="space-y-8">
+        <div className="border-t border-dashed border-border/50" />
+
+        {/* ── 5. LICENSE & AVAILABILITY ─────────────────────────────────── */}
+        <div className="space-y-6">
           <h2 className="text-xl font-semibold text-text-primary font-mono">
-            License & Availability
+            License &amp; Availability
           </h2>
 
-          <div className="flex items-center">
+          <div className="flex items-center gap-3">
             <input
               type="checkbox"
               id="isOpenSource"
@@ -958,17 +1006,12 @@ export default function SubmissionForm({ user }: SubmissionFormProps) {
               onChange={handleInputChange}
               className="h-4 w-4 text-accent bg-bg-deep border-border rounded focus:ring-accent focus:ring-2"
             />
-            <label
-              htmlFor="isOpenSource"
-              className="ml-2 block text-sm text-text-primary"
-            >
+            <label htmlFor="isOpenSource" className="text-sm text-text-primary">
               This is open source
             </label>
           </div>
 
-          <div className="border-t border-dashed border-border/50 pt-6"></div>
-
-          <div>
+          <div className="max-w-xs">
             <label
               htmlFor="license"
               className="block text-sm font-medium text-text-primary mb-2"
@@ -981,47 +1024,18 @@ export default function SubmissionForm({ user }: SubmissionFormProps) {
               required
               value={formData.license}
               onChange={handleInputChange}
-              disabled={isAnalyzing}
-              className="w-full px-3 py-2 bg-bg-deep border border-border rounded-sm text-text-primary focus:border-accent focus:outline-none disabled:opacity-50 disabled:cursor-not-allowed"
+              className="w-full px-3 py-2 bg-bg-deep border border-border rounded-sm text-text-primary focus:border-accent focus:outline-none"
             >
-              {commonLicenses.map((license) => (
-                <option key={license} value={license}>
-                  {license}
+              {commonLicenses.map((l) => (
+                <option key={l} value={l}>
+                  {l}
                 </option>
               ))}
             </select>
           </div>
         </div>
 
-        {/* Overview Section */}
-        <div className="space-y-8">
-          <h2 className="text-xl font-semibold text-text-primary font-mono">
-            Overview & Usage
-          </h2>
-
-          <div>
-            <label
-              htmlFor="overview"
-              className="block text-sm font-medium text-text-primary mb-2"
-            >
-              Overview
-            </label>
-            <textarea
-              id="overview"
-              name="overview"
-              rows={8}
-              value={formData.overview}
-              onChange={handleInputChange}
-              disabled={isAnalyzing}
-              className="w-full px-3 py-2 bg-bg-deep border border-border rounded-sm text-text-primary placeholder-text-dim focus:border-accent focus:outline-none resize-vertical disabled:opacity-50 disabled:cursor-not-allowed"
-              placeholder="Comprehensive guide shown on the skill details page. Include usage
-              examples, configuration details, etc. (Auto-populated from README
-              when available)..."
-            />
-          </div>
-        </div>
-
-        {/* Submit Button */}
+        {/* ── SUBMIT ────────────────────────────────────────────────────── */}
         <div className="border-t border-border pt-8">
           {error && (
             <div className="mb-4 p-3 bg-red-500/10 border border-red-500/20 rounded-sm">
@@ -1041,7 +1055,7 @@ export default function SubmissionForm({ user }: SubmissionFormProps) {
 
           <p className="text-xs text-text-dim mt-4">
             Your submission will be reviewed by our team before being published.
-            You'll receive an email notification once it's approved or if
+            You&apos;ll receive a notification once it&apos;s approved or if
             changes are needed.
           </p>
         </div>

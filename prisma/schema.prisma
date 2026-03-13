@@ -154,6 +154,7 @@ model Submission {
   status           SubmissionStatus @default(pending)
   createdAt        DateTime         @default(now())
   installCommand   String?
+  parsedSkillData  Json?
   user             User             @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@map("submissions")
