@@ -6,8 +6,11 @@ export function middleware(request: NextRequest) {
   
   if (protectedRoutes.some(route => request.nextUrl.pathname.startsWith(route))) {
     // Check for Better Auth session cookie
-    const sessionToken = request.cookies.get('better-auth.session_token');
-    
+    // In production (HTTPS), Better Auth sets __Secure- prefixed cookies
+    const sessionToken =
+      request.cookies.get('better-auth.session_token') ||
+      request.cookies.get('__Secure-better-auth.session_token');
+
     if (!sessionToken) {
       return NextResponse.redirect(new URL('/login', request.url));
     }

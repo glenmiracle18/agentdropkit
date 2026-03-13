@@ -5,14 +5,29 @@ import { useSession, signOut } from "@/lib/auth-client";
 import Image from "next/image";
 import { useTheme } from "next-themes";
 import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 import AgentDropkitLogo from "@/public/assets/logo";
 
 export default function Navigation() {
   const { data: session, isPending } = useSession();
   const { theme, setTheme, resolvedTheme } = useTheme();
+  const router = useRouter();
   const [mounted, setMounted] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [isProfileMenuOpen, setIsProfileMenuOpen] = useState(false);
+
+  const handleSignOut = async () => {
+    setIsProfileMenuOpen(false);
+    setIsMobileMenuOpen(false);
+    await signOut({
+      fetchOptions: {
+        onSuccess: () => {
+          router.push("/");
+          router.refresh();
+        },
+      },
+    });
+  };
 
   // Prevent hydration mismatch
   useEffect(() => {
@@ -48,18 +63,18 @@ export default function Navigation() {
             >
               Directory
             </Link>
-            <Link
-              href="/docs"
-              className="text-text-muted hover:text-text-primary transition-colors font-bold"
+            <span
+              className="text-text-muted/30 font-bold cursor-not-allowed select-none blur-[1.5px] pointer-events-none"
+              title="Coming soon"
             >
               Docs
-            </Link>
-            <Link
-              href="/advertise"
-              className="text-text-muted hover:text-text-primary transition-colors font-bold"
+            </span>
+            <span
+              className="text-text-muted/30 font-bold cursor-not-allowed select-none blur-[1.5px] pointer-events-none"
+              title="Coming soon"
             >
               Advertise
-            </Link>
+            </span>
             <Link
               href="/submit"
               className="text-text-muted hover:text-text-primary transition-colors font-bold"
@@ -160,10 +175,7 @@ export default function Navigation() {
                       </Link>
                     )}
                     <button
-                      onClick={() => {
-                        setIsProfileMenuOpen(false);
-                        signOut();
-                      }}
+                      onClick={handleSignOut}
                       className="px-4 py-3 text-left bg-text-primary text-bg-base hover:bg-text-muted transition-colors w-full"
                     >
                       Sign Out
@@ -217,13 +229,11 @@ export default function Navigation() {
           >
             Directory
           </Link>
-          <Link
-            href="/advertise"
-            onClick={() => setIsMobileMenuOpen(false)}
-            className="px-6 py-4 border-b-2 border-border text-text-primary hover:bg-bg-inset transition-colors"
+          <span
+            className="px-6 py-4 border-b-2 border-border text-text-muted/30 font-bold blur-[1.5px] select-none pointer-events-none cursor-not-allowed"
           >
             Advertise
-          </Link>
+          </span>
           <Link
             href="/submit"
             onClick={() => setIsMobileMenuOpen(false)}
@@ -279,7 +289,7 @@ export default function Navigation() {
                   </span>
                 </div>
                 <button
-                  onClick={() => signOut()}
+                  onClick={handleSignOut}
                   className="w-full py-3 text-center border-2 border-border hover:bg-border hover:text-bg-base transition-colors"
                 >
                   Sign Out
