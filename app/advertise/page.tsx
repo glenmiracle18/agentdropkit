@@ -88,7 +88,7 @@ export default function AdvertisePage() {
     return () => clearInterval(interval);
   }, [bannerAds.length]);
 
-  const getMailtoLink = (adType) => {
+  const getMailtoLink = (adType: { emailSubject: string; emailBody: string }) => {
     const subject = encodeURIComponent(adType.emailSubject);
     const body = encodeURIComponent(adType.emailBody);
     return `mailto:bonyuglen@gmail.com?subject=${subject}&body=${body}`;
