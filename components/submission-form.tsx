@@ -165,6 +165,7 @@ export default function SubmissionForm({ user }: SubmissionFormProps) {
     Record<string, DetectedSkill>
   >({});
   const [selectedSkillPath, setSelectedSkillPath] = useState<string>("");
+  const [skillSearch, setSkillSearch] = useState("");
   const [currentTriggerWord, setCurrentTriggerWord] = useState("");
   const [currentTag, setCurrentTag] = useState("");
 
@@ -611,7 +612,7 @@ export default function SubmissionForm({ user }: SubmissionFormProps) {
                 {selectedSkillPath && (
                   <button
                     type="button"
-                    onClick={() => setSelectedSkillPath("")}
+                    onClick={() => { setSelectedSkillPath(""); setSkillSearch(""); }}
                     className="text-xs text-text-dim hover:text-accent transition-colors underline underline-offset-2"
                   >
                     Change
@@ -661,35 +662,91 @@ export default function SubmissionForm({ user }: SubmissionFormProps) {
               ) : (
                 /* Full list — shown when no skill is selected yet */
                 <div className="space-y-2">
-                  {skillPaths.map((skillPath) => {
-                    const skill = detectedSkills[skillPath];
-                    return (
-                      <div
-                        key={skillPath}
-                        className="p-4 border border-border hover:border-accent/50 rounded-sm cursor-pointer transition-colors"
-                        onClick={() => selectSkill(skillPath, skill)}
+                  {/* Search filter — only shown when there are enough skills to warrant it */}
+                  {skillPaths.length > 5 && (
+                    <div className="relative">
+                      <input
+                        type="text"
+                        placeholder="Search skills..."
+                        value={skillSearch}
+                        onChange={(e) => setSkillSearch(e.target.value)}
+                        className="w-full px-3 py-2 pl-8 bg-bg-deep border border-border rounded-sm text-sm text-text-primary placeholder:text-text-dim focus:outline-none focus:border-accent font-mono"
+                      />
+                      <svg
+                        className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-text-muted pointer-events-none"
+                        fill="none"
+                        stroke="currentColor"
+                        viewBox="0 0 24 24"
+                        strokeWidth="2"
                       >
-                        <div className="flex items-start justify-between gap-4">
-                          <div className="min-w-0">
-                            <h4 className="font-medium text-text-primary truncate">
-                              {skill.metadata.name}
-                            </h4>
-                            <p className="text-sm text-text-secondary mt-0.5 truncate">
-                              {skill.metadata.description}
-                            </p>
-                            <p className="text-xs text-text-dim mt-1">
-                              {skillPath === "root" ? "/" : `/${skillPath}`}
-                              {" · "}
-                              {(skill.files as unknown[]).length} files
-                            </p>
-                          </div>
-                          <span className="shrink-0 text-xs text-text-dim mt-0.5">
-                            Select →
-                          </span>
-                        </div>
-                      </div>
+                        <circle cx="11" cy="11" r="8" />
+                        <path d="m21 21-4.35-4.35" />
+                      </svg>
+                    </div>
+                  )}
+
+                  {(() => {
+                    const query = skillSearch.trim().toLowerCase();
+                    const filtered = skillPaths.filter((skillPath) => {
+                      if (!query) return true;
+                      const skill = detectedSkills[skillPath];
+                      return (
+                        skill.metadata.name.toLowerCase().includes(query) ||
+                        skillPath.toLowerCase().includes(query)
+                      );
+                    });
+
+                    if (filtered.length === 0) {
+                      return (
+                        <p className="text-xs text-text-dim text-center py-4 font-mono">
+                          No skills match &ldquo;{skillSearch}&rdquo;
+                        </p>
+                      );
+                    }
+
+                    return (
+                      <>
+                        {filtered.map((skillPath) => {
+                          const skill = detectedSkills[skillPath];
+                          return (
+                            <div
+                              key={skillPath}
+                              className="p-4 border border-border hover:border-accent/50 rounded-sm cursor-pointer transition-colors"
+                              onClick={() => {
+                                setSkillSearch("");
+                                selectSkill(skillPath, skill);
+                              }}
+                            >
+                              <div className="flex items-start justify-between gap-4">
+                                <div className="min-w-0">
+                                  <h4 className="font-medium text-text-primary truncate">
+                                    {skill.metadata.name}
+                                  </h4>
+                                  <p className="text-sm text-text-secondary mt-0.5 truncate">
+                                    {skill.metadata.description}
+                                  </p>
+                                  <p className="text-xs text-text-dim mt-1">
+                                    {skillPath === "root" ? "/" : `/${skillPath}`}
+                                    {" · "}
+                                    {(skill.files as unknown[]).length} files
+                                  </p>
+                                </div>
+                                <span className="shrink-0 text-xs text-text-dim mt-0.5">
+                                  Select →
+                                </span>
+                              </div>
+                            </div>
+                          );
+                        })}
+                        {query && (
+                          <p className="text-xs text-text-dim text-center pt-1 font-mono">
+                            {filtered.length} of {skillPaths.length} skills
+                          </p>
+                        )}
+                      </>
                     );
-                  })}
+                  })()}
+
                   <p className="sr-only">
                     Click a skill to auto-populate the form fields below
                   </p>
