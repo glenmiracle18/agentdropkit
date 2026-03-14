@@ -3,6 +3,9 @@ import { auth } from '@/lib/auth';
 import { headers } from 'next/headers';
 import type { Prisma } from '@prisma/client';
 import SkillCard from './skill-card';
+import Link from 'next/link';
+
+const PAGE_SIZE = 12;
 
 interface ListingGridProps {
   searchParams: Promise<{
@@ -11,7 +14,19 @@ interface ListingGridProps {
     type?: string;
     sort?: string;
     official_only?: string;
+    page?: string;
   }>;
+}
+
+/** Build a URL string for a specific page, preserving all other search params */
+function pageUrl(params: Record<string, string | undefined>, page: number): string {
+  const qs = new URLSearchParams();
+  for (const [k, v] of Object.entries(params)) {
+    if (v && k !== 'page') qs.set(k, v);
+  }
+  if (page > 1) qs.set('page', String(page));
+  const str = qs.toString();
+  return str ? `/?${str}` : '/';
 }
 
 export default async function ListingGrid({ searchParams }: ListingGridProps) {
@@ -21,6 +36,8 @@ export default async function ListingGrid({ searchParams }: ListingGridProps) {
   const type = params.type;
   const sort = params.sort || 'trending';
   const officialOnly = params.official_only === 'true';
+  const currentPage = Math.max(1, parseInt(params.page || '1', 10));
+  const skip = (currentPage - 1) * PAGE_SIZE;
 
   // Build where conditions
   const where: Prisma.ListingWhereInput = {};
@@ -56,7 +73,7 @@ export default async function ListingGrid({ searchParams }: ListingGridProps) {
       'Tools': 'tool'
     };
     conditions.push({
-      type: typeMap[type] as any,
+      type: typeMap[type] as Prisma.EnumListingTypeFilter['equals'],
     });
   }
 
@@ -95,11 +112,18 @@ export default async function ListingGrid({ searchParams }: ListingGridProps) {
       break;
   }
 
-  const results = await db.listing.findMany({
-    where,
-    orderBy,
-    take: 20,
-  });
+  // Parallel fetch: results + total count
+  const [results, total] = await Promise.all([
+    db.listing.findMany({
+      where,
+      orderBy,
+      take: PAGE_SIZE,
+      skip,
+    }),
+    db.listing.count({ where }),
+  ]);
+
+  const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
 
   // Get user session and their votes
   const session = await auth.api.getSession({
@@ -127,12 +151,36 @@ export default async function ListingGrid({ searchParams }: ListingGridProps) {
     userVote: userVoteMap.get(listing.id) as "up" | "down" | undefined,
   }));
 
+  // Build page numbers to show (current ±2, clamped, with ellipsis)
+  function getPageNumbers(): (number | '…')[] {
+    if (totalPages <= 7) {
+      return Array.from({ length: totalPages }, (_, i) => i + 1);
+    }
+    const pages: (number | '…')[] = [1];
+    const left = Math.max(2, currentPage - 2);
+    const right = Math.min(totalPages - 1, currentPage + 2);
+    if (left > 2) pages.push('…');
+    for (let i = left; i <= right; i++) pages.push(i);
+    if (right < totalPages - 1) pages.push('…');
+    pages.push(totalPages);
+    return pages;
+  }
+
+  const pageNumbers = getPageNumbers();
+  const hasPrev = currentPage > 1;
+  const hasNext = currentPage < totalPages;
+
   return (
     <div className="space-y-6">
       {/* Results count */}
       <div className="flex items-center justify-between">
-        <p className="text-text-muted font-bold tracking-widest uppercase">
-          Showing {listingsWithVotes.length} {listingsWithVotes.length === 1 ? 'skill' : 'skills'}
+        <p className="text-text-muted font-bold tracking-widest uppercase text-xs">
+          {total} {total === 1 ? 'skill' : 'skills'}
+          {totalPages > 1 && (
+            <span className="ml-2 text-text-muted/60">
+              — page {currentPage} of {totalPages}
+            </span>
+          )}
         </p>
       </div>
 
@@ -151,6 +199,63 @@ export default async function ListingGrid({ searchParams }: ListingGridProps) {
         <div className="text-center py-16">
           <p className="text-text-primary font-bold text-lg">No skills found matching your criteria.</p>
           <p className="text-text-muted mt-2">Try adjusting your filters or search terms.</p>
+        </div>
+      )}
+
+      {/* Pagination */}
+      {totalPages > 1 && (
+        <div className="flex items-center justify-center gap-1 pt-4 font-mono text-xs font-bold uppercase tracking-widest select-none">
+          {/* Prev */}
+          {hasPrev ? (
+            <Link
+              href={pageUrl(params, currentPage - 1)}
+              className="px-3 py-2 border-2 border-border text-text-primary hover:bg-bg-card transition-colors"
+            >
+              ← Prev
+            </Link>
+          ) : (
+            <span className="px-3 py-2 border-2 border-border text-text-muted opacity-30 cursor-not-allowed">
+              ← Prev
+            </span>
+          )}
+
+          {/* Page numbers */}
+          {pageNumbers.map((p, i) =>
+            p === '…' ? (
+              <span key={`ellipsis-${i}`} className="px-2 py-2 text-text-muted">
+                …
+              </span>
+            ) : p === currentPage ? (
+              <span
+                key={p}
+                className="px-3 py-2 border-2 border-text-primary bg-text-primary text-bg-base"
+              >
+                {p}
+              </span>
+            ) : (
+              <Link
+                key={p}
+                href={pageUrl(params, p)}
+                className="px-3 py-2 border-2 border-border text-text-muted hover:text-text-primary hover:bg-bg-card transition-colors"
+              >
+                {p}
+              </Link>
+            )
+          )}
+
+          {/* Next */}
+          {hasNext ? (
+            <Link
+              href={pageUrl(params, currentPage + 1)}
+              className="px-3 py-2 border-2 border-border text-text-primary hover:bg-bg-card transition-colors"
+            >
+              Next →
+            </Link>
+          ) : (
+            <span className="px-3 py-2 border-2 border-border text-text-muted opacity-30 cursor-not-allowed">
+              Next →
+            </span>
+          )}
         </div>
       )}
     </div>

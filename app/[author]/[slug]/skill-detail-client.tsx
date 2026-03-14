@@ -140,7 +140,7 @@ export default function SkillDetailClient({ skill }: SkillDetailClientProps) {
         <span className="text-border">/</span>
         <span className="text-text-accent">{skill.authorHandle}</span>
         <span className="text-border">/</span>
-        <span className="text-text-accent">{skill.slug}</span>
+        <span className="text-text-accent">{skill.name}</span>
       </div>
 
       <div className="flex flex-col lg:flex-row gap-10 md:gap-14">
@@ -470,7 +470,7 @@ export default function SkillDetailClient({ skill }: SkillDetailClientProps) {
                 </div>
 
                 {/* File content */}
-                <div className="flex-1 bg-bg-card min-h-[300px] md:max-h-[550px] relative flex flex-col overflow-hidden">
+                <div className="flex-1 bg-bg-card min-h-[300px] max-h-[400px] md:max-h-[550px] relative flex flex-col overflow-hidden">
                   {selectedFile ? (
                     <>
                       {/* Copy file content */}

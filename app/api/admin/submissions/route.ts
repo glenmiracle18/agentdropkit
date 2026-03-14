@@ -99,14 +99,26 @@ export async function PATCH(request: NextRequest) {
     const repoOwner = repoMatch ? repoMatch[1] : submission.authorHandle;
     const repoName = repoMatch ? repoMatch[2].replace(/\.git$/, '') : null;
 
-    const baseSlug =
-      repoName ??
-      submission.name
-        .toLowerCase()
-        .replace(/[^a-z0-9\s-]/g, '')
-        .replace(/\s+/g, '-')
-        .replace(/-+/g, '-')
-        .trim();
+    // Priority: skill metadata name → submission.name → repo name
+    // This ensures the slug (and URL) reflects the skill's display name
+    // (e.g. "DOCX" → "docx") rather than the raw GitHub repo name
+    // (e.g. "claude-skills" → "skills-2").
+    const skillMetaName = isSkillSubmissionRef(submission.parsedSkillData)
+      ? (submission.parsedSkillData.metadata as { name?: string }).name ?? null
+      : null;
+
+    const rawSlugSource =
+      skillMetaName ||
+      submission.name ||
+      repoName ||
+      'skill';
+
+    const baseSlug = rawSlugSource
+      .toLowerCase()
+      .replace(/[^a-z0-9\s-]/g, '')
+      .replace(/\s+/g, '-')
+      .replace(/-+/g, '-')
+      .trim();
 
     let slug = baseSlug;
     let counter = 1;

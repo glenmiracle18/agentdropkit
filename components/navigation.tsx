@@ -205,7 +205,7 @@ export default function Navigation() {
 
       {/* Mobile Menu Overlay */}
       {isMobileMenuOpen && (
-        <div className="absolute top-full left-0 w-full bg-bg-surface border-b-2 border-border md:hidden flex flex-col font-mono tracking-widest text-sm uppercase font-bold">
+        <div className="absolute top-full left-0 w-full z-40 bg-bg-base border-b-2 border-border shadow-[0_8px_24px_rgba(0,0,0,0.15)] md:hidden flex flex-col font-mono tracking-widest text-sm uppercase font-bold">
           <Link
             href="/"
             onClick={() => setIsMobileMenuOpen(false)}
