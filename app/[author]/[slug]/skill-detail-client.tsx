@@ -27,7 +27,9 @@ export default function SkillDetailClient({ skill }: SkillDetailClientProps) {
   const [copied, setCopied] = useState(false);
   const [copiedFile, setCopiedFile] = useState(false);
   const [selectedFile, setSelectedFile] = useState<SkillFileData | null>(
-    skill.files?.[0] ?? null,
+    skill.files?.find((f: SkillFileData) => f.name.toLowerCase() === "skill.md") ??
+    skill.files?.[0] ??
+    null,
   );
   const [contentKey, setContentKey] = useState(0);
   const [installScope, setInstallScope] = useState<"global" | "project">(

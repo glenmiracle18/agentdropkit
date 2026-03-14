@@ -103,7 +103,7 @@ function TreeNode({ item, selectedPath, onFileSelect, depth }: TreeNodeProps) {
   if (item.items) {
     // Directory node
     return (
-      <Collapsible defaultOpen>
+      <Collapsible>
         <CollapsibleTrigger asChild>
           <button
             className="group flex w-full items-center gap-1.5 py-1 pr-2 text-left font-mono text-xs font-bold uppercase tracking-widest text-text-muted hover:text-text-primary transition-colors"
