@@ -12,7 +12,7 @@ const octokit = new Octokit({
 });
 
 const MAX_FILES_PER_SKILL = 30;
-const MAX_SKILLS = 10; // cap how many skill dirs we process per repo
+const MAX_SKILLS = 50; // cap how many skill dirs we process per repo
 const MAX_FILE_BYTES = 100_000; // 100 KB per file — skip anything larger
 
 // Strictly parse a GitHub HTTPS URL.
