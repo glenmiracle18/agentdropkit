@@ -120,16 +120,13 @@ export async function POST(request: NextRequest) {
           ? skillPath.substring(0, skillPath.lastIndexOf('/'))
           : '';
 
-        // Only files that live directly inside this skill directory (non-recursive)
+        // All files under this skill directory (recursive — includes subfolders)
         const siblingItems = treeItems.filter(item => {
           if (item.type !== 'blob' || !item.path) return false;
           // H-4: Skip large files before fetching to avoid memory/storage bloat
           if ((item.size ?? 0) > MAX_FILE_BYTES) return false;
-          if (skillDir === '') {
-            return !item.path.includes('/');
-          }
-          const relative = item.path.substring(skillDir.length + 1);
-          return item.path.startsWith(skillDir + '/') && !relative.includes('/');
+          if (skillDir === '') return true; // root skill — include all blobs
+          return item.path.startsWith(skillDir + '/'); // subdir skill — all blobs under dir
         });
 
         const filesToFetch = siblingItems.slice(0, MAX_FILES_PER_SKILL);

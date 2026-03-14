@@ -7,6 +7,7 @@ import { generateInstallCommandWithScopes } from "@/lib/install-command";
 import { useVoteMutation } from "@/lib/queries/listings";
 import type { ListingDetail, SkillFileData } from "@/lib/queries/listings";
 import { IconTags, IconAtSign } from "@/public/assets/arcade-icons-darkmode";
+import { FileTree } from "@/components/file-tree";
 
 interface SkillDetailClientProps {
   skill: ListingDetail;
@@ -451,26 +452,19 @@ export default function SkillDetailClient({ skill }: SkillDetailClientProps) {
               </h3>
 
               <div className="flex flex-col md:flex-row border-2 border-border bg-bg-card shadow-[4px_4px_0px_0px_var(--color-border)] md:shadow-[6px_6px_0px_0px_var(--color-border)]">
-                {/* File list sidebar */}
-                <div className="w-full md:w-48 border-b-2 md:border-b-0 md:border-r-2 border-border flex flex-row md:flex-col bg-bg-base overflow-x-auto shrink-0">
-                  {skill.files.map((file: SkillFileData) => (
-                    <button
-                      key={file.name}
-                      onClick={() => {
-                        if (selectedFile?.name === file.name) return;
-                        setSelectedFile(file);
-                        setContentKey((k) => k + 1);
-                        setCopiedFile(false);
-                      }}
-                      className={`flex items-center gap-2 p-3 md:p-4 text-left font-bold text-xs border-r-2 md:border-r-0 md:border-b-2 border-border transition-all duration-150 active:scale-95 whitespace-nowrap md:whitespace-normal last:border-r-0 md:last:border-b-0 ${
-                        selectedFile?.name === file.name
-                          ? "bg-text-primary text-bg-base"
-                          : "text-text-muted hover:text-text-primary hover:bg-bg-card"
-                      }`}
-                    >
-                      <span className="truncate">{file.name}</span>
-                    </button>
-                  ))}
+                {/* File tree sidebar */}
+                <div className="w-full md:w-52 border-b-2 md:border-b-0 md:border-r-2 border-border bg-bg-base shrink-0 overflow-y-auto md:max-h-[550px]">
+                  <FileTree
+                    files={skill.files}
+                    selectedPath={selectedFile?.path}
+                    onFileSelect={(f) => {
+                      const match = skill.files.find((sf: SkillFileData) => sf.path === f.path);
+                      if (!match || selectedFile?.path === match.path) return;
+                      setSelectedFile(match);
+                      setContentKey((k) => k + 1);
+                      setCopiedFile(false);
+                    }}
+                  />
                 </div>
 
                 {/* File content */}
@@ -563,7 +557,7 @@ export default function SkillDetailClient({ skill }: SkillDetailClientProps) {
 
                       {/* Status bar */}
                       <div className="shrink-0 border-t border-border/40 px-4 py-1.5 flex items-center gap-3 text-xs text-text-muted font-mono bg-bg-base/60 select-none">
-                        <span className="truncate">{selectedFile.name}</span>
+                        <span className="truncate">{selectedFile.path || selectedFile.name}</span>
                         <span className="opacity-30 shrink-0">·</span>
                         <span className="tabular-nums shrink-0">
                           {selectedFileLines.length} lines

@@ -6,6 +6,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import { sileo } from "sileo";
 import { generateInstallCommand } from "@/lib/install-command";
 import { submissionsQueryKey } from "@/lib/queries/submissions";
+import { FileTree } from "@/components/file-tree";
 
 interface User {
   id: string;
@@ -68,18 +69,28 @@ const commonLicenses = [
 ];
 
 const availableAgents = [
-  "Claude",
-  "GPT-4",
-  "GPT-3.5",
+  "Cursor",
+  "Claude Code",
+  "Gemini CLI",
+  "GitHub Copilot",
   "Codex",
-  "Gemini",
-  "LLaMA",
-  "Anthropic Claude",
-  "OpenAI GPT",
-  "Google Bard",
-  "Microsoft Copilot",
-  "Cohere",
-  "AI21 Jurassic",
+  "OpenCode",
+  "Antigravity",
+  "OpenClaws",
+  "Aider",
+  "Cline",
+  "RooCode",
+  "Windsurf",
+  "Devin",
+  "Manus",
+  "Amp",
+  "Goose",
+  "Crush",
+  "Kiro",
+  "Kilo Code",
+  "Zencoder",
+  "Amazon Q",
+  "Tabnine",
   "Other",
 ];
 
@@ -632,14 +643,18 @@ export default function SubmissionForm({ user }: SubmissionFormProps) {
                     </span>
                   </div>
 
-                  {selectedSkill.fileTree && (
-                    <div className="mt-3 p-3 bg-bg-deep rounded border border-border">
-                      <p className="text-xs font-medium text-text-secondary mb-1.5">
+                  {(selectedSkill.files as unknown[]).length > 0 && (
+                    <div className="mt-3 border border-border bg-bg-base">
+                      <p className="px-3 pt-2 pb-1 text-xs font-bold text-text-muted uppercase tracking-widest border-b border-border">
                         File structure
                       </p>
-                      <pre className="text-xs text-text-dim font-mono leading-relaxed">
-                        {selectedSkill.fileTree.join("\n")}
-                      </pre>
+                      <FileTree
+                        files={(selectedSkill.files as Array<{ filePath: string; fileName: string }>).map((f) => ({
+                          name: f.fileName,
+                          path: f.filePath,
+                        }))}
+                        className="py-1 max-h-48 overflow-y-auto"
+                      />
                     </div>
                   )}
                 </div>
