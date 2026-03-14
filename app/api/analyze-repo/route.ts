@@ -15,9 +15,16 @@ const MAX_FILES_PER_SKILL = 30;
 const MAX_SKILLS = 50; // cap how many skill dirs we process per repo
 const MAX_FILE_BYTES = 100_000; // 100 KB per file — skip anything larger
 
-// Strictly parse a GitHub HTTPS URL.
-// Returns null for anything that isn't exactly https://github.com/<owner>/<repo>.
-function parseGitHubUrl(rawUrl: string): { owner: string; repo: string } | null {
+// Parse a GitHub HTTPS URL — accepts both:
+//   https://github.com/<owner>/<repo>           (standard repo URL)
+//   https://github.com/<owner>/<repo>/tree/<branch>/<path>  (direct skill dir URL)
+// Returns { owner, repo, skillPath? } where skillPath is the subdirectory
+// hint extracted from the /tree/... URL (undefined for plain repo URLs).
+function parseGitHubUrl(rawUrl: string): {
+  owner: string;
+  repo: string;
+  skillPath?: string;
+} | null {
   let url: URL;
   try { url = new URL(rawUrl); } catch { return null; }
   if (url.protocol !== 'https:' || url.hostname !== 'github.com') return null;
@@ -29,7 +36,16 @@ function parseGitHubUrl(rawUrl: string): { owner: string; repo: string } | null 
   // Only allow characters GitHub permits in owner/repo names
   const valid = /^[a-zA-Z0-9_.-]+$/;
   if (!valid.test(owner) || !valid.test(repo)) return null;
-  return { owner, repo };
+
+  // Detect /tree/<branch>/<path> — e.g. .../tree/main/finance or .../tree/main/skills/pdf
+  // parts: [owner, repo, 'tree', branch, ...pathSegments]
+  let skillPath: string | undefined;
+  if (parts[2] === 'tree' && parts.length > 4) {
+    const path = parts.slice(4).join('/').replace(/\/$/, '');
+    if (path) skillPath = path;
+  }
+
+  return { owner, repo, skillPath };
 }
 
 interface RepoAnalysis {
@@ -51,27 +67,30 @@ export async function POST(request: NextRequest) {
   }
 
   try {
-    let body: { repoUrl?: string };
+    let body: { repoUrl?: string; skillPathHint?: string };
     try {
       body = await request.json();
     } catch {
       return NextResponse.json({ error: 'Invalid JSON in request body' }, { status: 400 });
     }
 
-    const { repoUrl } = body;
+    const { repoUrl, skillPathHint: bodyHint } = body;
     if (!repoUrl) {
       return NextResponse.json({ error: 'Repository URL is required' }, { status: 400 });
     }
 
-    // C-3: Strict URL validation — must be exactly https://github.com/<owner>/<repo>
+    // C-3: Accept both plain repo URLs and direct skill directory URLs
+    // (https://github.com/owner/repo/tree/branch/path)
     const parsed = parseGitHubUrl(repoUrl);
     if (!parsed) {
       return NextResponse.json(
-        { error: 'URL must be a valid public GitHub repository (https://github.com/owner/repo)' },
+        { error: 'URL must be a valid GitHub repository or skill directory URL (https://github.com/owner/repo)' },
         { status: 400 },
       );
     }
-    const { owner, repo } = parsed;
+    const { owner, repo, skillPath: urlSkillPath } = parsed;
+    // URL-extracted path takes priority over a separately-supplied hint
+    const effectiveSkillPath = urlSkillPath ?? bodyHint ?? null;
 
     // 1. Fetch repo metadata + full recursive tree in parallel — 2 API calls total
     let repoData: Awaited<ReturnType<typeof octokit.rest.repos.get>>['data'] | null = null;
@@ -101,13 +120,22 @@ export async function POST(request: NextRequest) {
       .map(item => item.path!)
       .sort();
 
-    // 3. Find all SKILL.md files in the tree
-    const skillMdItems = treeItems.filter(
-      item =>
-        item.type === 'blob' &&
-        (item.path?.toLowerCase() === 'skill.md' ||
-          item.path?.toLowerCase().endsWith('/skill.md'))
-    );
+    // 3. Find SKILL.md files in the tree.
+    //    If a direct skill path was provided (via /tree/... URL or hint), only
+    //    look in that specific directory — fast and precise.
+    //    Otherwise scan the whole tree for all SKILL.md files.
+    const skillMdItems = effectiveSkillPath
+      ? treeItems.filter(
+          item =>
+            item.type === 'blob' &&
+            item.path?.toLowerCase() === `${effectiveSkillPath}/skill.md`,
+        )
+      : treeItems.filter(
+          item =>
+            item.type === 'blob' &&
+            (item.path?.toLowerCase() === 'skill.md' ||
+              item.path?.toLowerCase().endsWith('/skill.md')),
+        );
 
     // C-2: Cap how many skill directories we process per request to bound API usage.
     const skillMdItemsCapped = skillMdItems.slice(0, MAX_SKILLS);

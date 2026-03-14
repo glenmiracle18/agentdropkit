@@ -166,6 +166,8 @@ export default function SubmissionForm({ user }: SubmissionFormProps) {
   >({});
   const [selectedSkillPath, setSelectedSkillPath] = useState<string>("");
   const [skillSearch, setSkillSearch] = useState("");
+  // Skill path hint extracted from a direct /tree/<branch>/<path> URL
+  const [skillPathHint, setSkillPathHint] = useState<string>("");
   const [currentTriggerWord, setCurrentTriggerWord] = useState("");
   const [currentTag, setCurrentTag] = useState("");
 
@@ -319,7 +321,7 @@ export default function SubmissionForm({ user }: SubmissionFormProps) {
   // H-5: analyzeRepository accepts an AbortSignal so stale in-flight requests
   // can be cancelled when the URL changes before the response arrives.
   const analyzeRepository = useCallback(
-    async (repoUrl: string, signal?: AbortSignal) => {
+    async (repoUrl: string, signal?: AbortSignal, pathHint?: string) => {
       if (!repoUrl || !repoUrl.includes("github.com")) {
         setDetectedSkills({});
         return;
@@ -337,7 +339,7 @@ export default function SubmissionForm({ user }: SubmissionFormProps) {
         const response = await fetch("/api/analyze-repo", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ repoUrl }),
+          body: JSON.stringify({ repoUrl, skillPathHint: pathHint || undefined }),
           signal,
         });
 
@@ -422,21 +424,40 @@ export default function SubmissionForm({ user }: SubmissionFormProps) {
 
     const controller = new AbortController();
     const timeoutId = setTimeout(() => {
-      void analyzeRepository(url, controller.signal);
+      void analyzeRepository(url, controller.signal, skillPathHint || undefined);
     }, 1000);
 
     return () => {
       clearTimeout(timeoutId);
       controller.abort();
     };
-  }, [formData.repoUrl, analyzeRepository]);
+  }, [formData.repoUrl, skillPathHint, analyzeRepository]);
 
   const handleRepoUrlChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const { value } = e.target;
-    handleInputChange(e);
+    let value = e.target.value;
 
-    // Auto-extract repo owner as authorHandle from the URL
-    const ownerMatch = value.match(/github\.com\/([^\/]+)\/([^\/]+)/);
+    // Detect direct skill directory links:
+    // https://github.com/owner/repo/tree/<branch>/<path>
+    // Normalize to the base repo URL and store the skill path as a hint
+    const treeMatch = value.match(
+      /^(https?:\/\/github\.com\/[^/]+\/[^/]+)\/tree\/[^/]+\/(.+)$/,
+    );
+    if (treeMatch) {
+      const hint = treeMatch[2].replace(/\/$/, ""); // strip trailing slash
+      if (hint) {
+        setSkillPathHint(hint);
+        value = treeMatch[1]; // normalize to base repo URL
+      } else {
+        setSkillPathHint("");
+      }
+    } else {
+      setSkillPathHint("");
+    }
+
+    setFormData((prev) => ({ ...prev, repoUrl: value }));
+
+    // Auto-extract repo owner as authorHandle from the (normalized) URL
+    const ownerMatch = value.match(/github\.com\/([^/]+)\/([^/]+)/);
     if (ownerMatch) {
       setFormData((prev) => ({ ...prev, authorHandle: ownerMatch[1] }));
     }
@@ -545,7 +566,7 @@ export default function SubmissionForm({ user }: SubmissionFormProps) {
                 value={formData.repoUrl}
                 onChange={handleRepoUrlChange}
                 className="w-full px-3 py-2 bg-bg-deep border border-border rounded-sm text-text-primary placeholder-text-dim focus:border-accent focus:outline-none"
-                placeholder="https://github.com/username/repo"
+                placeholder="https://github.com/username/repo  or  .../tree/main/skill-dir"
               />
               {isAnalyzing && (
                 <div className="absolute right-3 top-1/2 -translate-y-1/2">
@@ -571,9 +592,19 @@ export default function SubmissionForm({ user }: SubmissionFormProps) {
                 </div>
               )}
             </div>
-            <p className="sr-only">
-              GitHub repository URL — will auto-scan for skills and content
-            </p>
+            {skillPathHint ? (
+              <p className="mt-1.5 text-xs font-mono font-bold text-accent flex items-center gap-1.5">
+                <span className="opacity-60">→</span>
+                Direct skill path detected:{" "}
+                <span className="text-text-primary bg-bg-card px-1.5 py-0.5 border border-border">
+                  {skillPathHint}
+                </span>
+              </p>
+            ) : (
+              <p className="mt-1 text-xs text-text-muted font-mono">
+                Paste a repo URL or a direct skill dir link (…/tree/main/skill-name)
+              </p>
+            )}
           </div>
 
           {/* Author (read-only, right next to repo URL) */}
