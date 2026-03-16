@@ -1,7 +1,6 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useSearchState } from "./search-state-provider";
 
 interface PaginationControlsProps {
   currentPage: number;
@@ -25,10 +24,13 @@ export default function PaginationControls({
   pageUrls,
 }: PaginationControlsProps) {
   const router = useRouter();
-  const { startSearchTransition } = useSearchState();
 
+  // TanStack Query (useListings) owns the loading/fetching state.
+  // Updating the URL param is enough — the grid refetches automatically
+  // and shows keepPreviousData + opacity fade during the transition.
+  // scroll: false keeps the viewport from jumping to the top on each page.
   function navigate(url: string) {
-    startSearchTransition(() => router.push(url));
+    router.push(url, { scroll: false });
   }
 
   return (

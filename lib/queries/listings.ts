@@ -1,6 +1,115 @@
 "use client";
 
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import {
+  useQuery,
+  useMutation,
+  useQueryClient,
+  keepPreviousData,
+} from "@tanstack/react-query";
+
+// ─── Grid / homepage listing card ─────────────────────────────────────────────
+
+/**
+ * Shape returned by GET /api/listings.
+ * Dates are ISO strings (JSON serialization of Prisma Date fields).
+ */
+export interface ListingCardData {
+  id: string;
+  slug: string;
+  name: string;
+  type: string;
+  description: string;
+  longDescription: string | null;
+  authorHandle: string;
+  repoUrl: string;
+  repoPath: string | null;
+  category: string;
+  tags: string[];
+  compatibleAgents: string[];
+  triggerWords: string[];
+  agentsInstalledOn: Record<string, unknown>;
+  isOpenSource: boolean;
+  license: string;
+  documentation: string | null;
+  isOfficial: boolean;
+  isSafe: boolean;
+  healthScore: number;
+  githubStars: number;
+  weeklyInstalls: number;
+  totalInstalls: number;
+  voteCount: number;
+  binaryDependencies: string[];
+  ejectedBy: string | null;
+  framework: string | null;
+  homepageUrl: string | null;
+  installCommand: string | null;
+  isEjected: boolean;
+  isVisible: boolean;
+  language: string | null;
+  npmDependencies: string[];
+  rankScore: number;
+  skillDependencies: string[];
+  version: string;
+  firstSeenAt: string;
+  createdAt: string;
+  updatedAt: string;
+  ejectedAt: string | null;
+  /** Attached server-side when the request is authenticated */
+  userVote?: "up" | "down" | null;
+}
+
+export interface ListingsParams {
+  search?: string;
+  category?: string;
+  type?: string;
+  sort?: string;
+  official_only?: string;
+  page?: number;
+  limit?: number;
+}
+
+export interface ListingsResponse {
+  listings: ListingCardData[];
+  total: number;
+  hasMore: boolean;
+}
+
+export const listingsQueryKey = (params: ListingsParams) =>
+  ["listings", "grid", params] as const;
+
+async function fetchListings(params: ListingsParams): Promise<ListingsResponse> {
+  const qs = new URLSearchParams();
+  if (params.search) qs.set("search", params.search);
+  if (params.category && params.category !== "All") qs.set("category", params.category);
+  if (params.type && params.type !== "All") qs.set("type", params.type);
+  if (params.sort) qs.set("sort", params.sort);
+  if (params.official_only) qs.set("official_only", params.official_only);
+  const limit = params.limit ?? 12;
+  qs.set("limit", String(limit));
+  const offset = ((params.page ?? 1) - 1) * limit;
+  if (offset > 0) qs.set("offset", String(offset));
+
+  const res = await fetch(`/api/listings?${qs.toString()}`);
+  if (!res.ok) throw new Error("Failed to fetch listings");
+  return res.json() as Promise<ListingsResponse>;
+}
+
+/**
+ * TanStack Query hook for the homepage listing grid.
+ *
+ * Uses `keepPreviousData` so the old page stays visible (at reduced opacity)
+ * while the next page is loading — no jarring blank-grid flash.
+ */
+export function useListings(params: ListingsParams) {
+  return useQuery<ListingsResponse>({
+    queryKey: listingsQueryKey(params),
+    queryFn: () => fetchListings(params),
+    staleTime: 60_000,
+    placeholderData: keepPreviousData,
+  });
+}
+
+// ─── Detail page ─────────────────────────────────────────────────────────────
 
 export interface SkillFileData {
   name: string;

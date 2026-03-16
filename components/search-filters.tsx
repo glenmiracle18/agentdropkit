@@ -4,22 +4,48 @@ import { useRouter, useSearchParams } from "next/navigation";
 
 const categories = [
   "All",
-  "Code Review",
-  "Design",
-  "Writing",
-  "Data",
+  // Tech
+  "Development",
+  "Data Analysis",
   "DevOps",
+  "Infrastructure",
+  "Security",
+  "Code Review",
   "Agents",
+  "Automation",
+  // Creative
+  "Writing",
+  "Design",
+  "Content Creation",
+  "Media & Video",
+  // Business
+  "Marketing",
+  "Sales",
+  "Finance",
+  "Legal",
+  "HR & Recruiting",
+  "Project Management",
+  "Customer Support",
+  // Knowledge
   "Research",
-  "Infrastructure"
+  "Education",
+  "Documentation",
+  // Personal
+  "Productivity",
+  "Communication",
+  "Health & Wellness",
+  "Entertainment",
+  // Catch-all
+  "Other",
 ];
 
 const sortOptions = [
+  { value: "ranked", label: "Best Match" },
   { value: "trending", label: "Trending" },
-  { value: "stars", label: "Most Stars" },
-  { value: "installs", label: "Most Installs" },
   { value: "newest", label: "Newest" },
   { value: "votes", label: "Top Voted" },
+  { value: "stars", label: "Most Stars" },
+  { value: "installs", label: "Most Installs" },
 ];
 
 export default function SearchFilters() {
@@ -27,7 +53,7 @@ export default function SearchFilters() {
   const searchParams = useSearchParams();
 
   const currentCategory = searchParams.get("category") || "All";
-  const currentSort = searchParams.get("sort") || "trending";
+  const currentSort = searchParams.get("sort") || "ranked";
 
   const updateSearchParams = (key: string, value: string | null) => {
     const params = new URLSearchParams(searchParams);
@@ -44,7 +70,7 @@ export default function SearchFilters() {
       {/* Filter Row: Header style */}
       <div className="flex flex-col sm:flex-row items-start sm:items-end justify-between border-b-2 border-border pb-4 gap-4 sm:gap-0">
         <h2 className="text-2xl sm:text-3xl font-bold font-mono text-text-primary tracking-tight">
-          Trending Skills
+          Top Skills
         </h2>
 
         {/* Categories / Sort Dropdown */}

@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { Octokit } from "@octokit/rest";
 import type { Listing } from "@prisma/client";
+import { computeRankScore } from "@/lib/ranking";
 
 const octokit = new Octokit({
   auth: process.env.GITHUB_TOKEN,
@@ -62,7 +63,17 @@ async function runSync(request: NextRequest) {
     if (stars !== null) {
       await db.listing.update({
         where: { id: listing.id },
-        data: { githubStars: stars },
+        data: {
+          githubStars: stars,
+          rankScore: computeRankScore({
+            voteCount: listing.voteCount,
+            githubStars: stars,
+            totalInstalls: listing.totalInstalls,
+            weeklyInstalls: listing.weeklyInstalls,
+            createdAt: listing.createdAt,
+            isOfficial: listing.isOfficial,
+          }),
+        },
       });
       successCount++;
     } else {

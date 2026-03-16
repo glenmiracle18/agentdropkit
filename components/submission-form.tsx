@@ -44,16 +44,38 @@ interface FormData {
 }
 
 const categories = [
+  // Tech
   "Development",
   "Data Analysis",
-  "Content Creation",
+  "DevOps",
+  "Infrastructure",
+  "Security",
+  "Code Review",
+  "Agents",
   "Automation",
-  "Research",
-  "Communication",
-  "Productivity",
-  "Entertainment",
-  "Education",
+  // Creative
+  "Writing",
+  "Design",
+  "Content Creation",
+  "Media & Video",
+  // Business
+  "Marketing",
+  "Sales",
   "Finance",
+  "Legal",
+  "HR & Recruiting",
+  "Project Management",
+  "Customer Support",
+  // Knowledge
+  "Research",
+  "Education",
+  "Documentation",
+  // Personal
+  "Productivity",
+  "Communication",
+  "Health & Wellness",
+  "Entertainment",
+  // Catch-all
   "Other",
 ];
 

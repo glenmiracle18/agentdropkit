@@ -303,11 +303,32 @@ export default function SkillsManagement() {
               className="w-full px-3 py-2 border border-border bg-bg-base text-text-primary focus:border-accent focus:outline-none"
             >
               <option value="all">All Categories</option>
-              <option value="automation">Automation</option>
-              <option value="data">Data & Analysis</option>
               <option value="development">Development</option>
+              <option value="data-analysis">Data Analysis</option>
+              <option value="devops">DevOps</option>
+              <option value="infrastructure">Infrastructure</option>
+              <option value="security">Security</option>
+              <option value="code-review">Code Review</option>
+              <option value="agents">Agents</option>
+              <option value="automation">Automation</option>
+              <option value="writing">Writing</option>
+              <option value="design">Design</option>
+              <option value="content-creation">Content Creation</option>
+              <option value="media-video">Media & Video</option>
+              <option value="marketing">Marketing</option>
+              <option value="sales">Sales</option>
+              <option value="finance">Finance</option>
+              <option value="legal">Legal</option>
+              <option value="hr-recruiting">HR & Recruiting</option>
+              <option value="project-management">Project Management</option>
+              <option value="customer-support">Customer Support</option>
+              <option value="research">Research</option>
+              <option value="education">Education</option>
+              <option value="documentation">Documentation</option>
               <option value="productivity">Productivity</option>
               <option value="communication">Communication</option>
+              <option value="health-wellness">Health & Wellness</option>
+              <option value="entertainment">Entertainment</option>
               <option value="other">Other</option>
             </select>
           </div>

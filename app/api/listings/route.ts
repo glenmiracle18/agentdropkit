@@ -8,14 +8,17 @@ export async function GET(request: NextRequest) {
     const search = searchParams.get('search');
     const category = searchParams.get('category');
     const type = searchParams.get('type');
-    const sort = searchParams.get('sort') || 'trending';
+    const sort = searchParams.get('sort') || 'ranked';
     const officialOnly = searchParams.get('official_only') === 'true';
     const limit = parseInt(searchParams.get('limit') || '20');
     const offset = parseInt(searchParams.get('offset') || '0');
 
     // Build where conditions
     const where: Prisma.ListingWhereInput = {};
-    const conditions: Prisma.ListingWhereInput[] = [];
+    // Always hide ejected/invisible listings from the public API
+    const conditions: Prisma.ListingWhereInput[] = [
+      { isVisible: true, isEjected: false },
+    ];
 
     // Apply filters
     if (search) {
@@ -40,9 +43,12 @@ export async function GET(request: NextRequest) {
         'MCPs': 'mcp', 
         'Tools': 'tool'
       };
-      conditions.push({
-        type: typeMap[type] as any,
-      });
+      const mappedType = typeMap[type];
+      if (mappedType) {
+        conditions.push({
+          type: mappedType as Prisma.EnumListingTypeFilter["equals"],
+        });
+      }
     }
 
     if (officialOnly) {
@@ -71,14 +77,15 @@ export async function GET(request: NextRequest) {
         orderBy = [{ voteCount: 'desc' }];
         break;
       case 'trending':
-      default:
-        // For trending, we'll order by weeklyInstalls for now
-        // (Prisma doesn't support complex expressions in orderBy)
         orderBy = [
           { weeklyInstalls: 'desc' },
           { totalInstalls: 'desc' },
           { voteCount: 'desc' }
         ];
+        break;
+      case 'ranked':
+      default:
+        orderBy = [{ rankScore: 'desc' }];
         break;
     }
 

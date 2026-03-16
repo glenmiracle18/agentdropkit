@@ -2,13 +2,10 @@
 
 import Link from "next/link";
 import { useState } from "react";
-import type { Listing } from "@prisma/client";
-import VoteButtons from "./vote-buttons";
+import type { ListingCardData } from "@/lib/queries/listings";
 
 interface SkillCardProps {
-  listing: Listing & {
-    userVote?: "up" | "down" | null;
-  };
+  listing: ListingCardData;
   index: number;
 }
 

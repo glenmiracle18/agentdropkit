@@ -6,15 +6,39 @@ import type { AnalyzedSkill, AnalyzeRepoResult } from "@/app/api/admin/bulk-anal
 import type { BulkCreateResult } from "@/app/api/admin/bulk-create/route";
 
 const CATEGORIES = [
-  "research",
-  "writing",
-  "coding",
-  "data",
-  "design",
+  // Tech
+  "development",
+  "data-analysis",
   "devops",
-  "agents",
   "infrastructure",
+  "security",
   "code-review",
+  "agents",
+  "automation",
+  // Creative
+  "writing",
+  "design",
+  "content-creation",
+  "media-video",
+  // Business
+  "marketing",
+  "sales",
+  "finance",
+  "legal",
+  "hr-recruiting",
+  "project-management",
+  "customer-support",
+  // Knowledge
+  "research",
+  "education",
+  "documentation",
+  // Personal
+  "productivity",
+  "communication",
+  "health-wellness",
+  "entertainment",
+  // Catch-all
+  "other",
 ];
 
 const ALL_AGENTS = [

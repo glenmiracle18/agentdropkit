@@ -555,8 +555,8 @@ export default function SkillDetailClient({ skill }: SkillDetailClientProps) {
                           ))}
                         </div>
 
-                        {/* Pre — scrolls horizontally */}
-                        <pre className="flex-1 p-4 text-text-primary font-mono text-xs sm:text-sm leading-5 whitespace-pre overflow-x-auto">
+                        {/* Pre — wraps at container width */}
+                        <pre className="flex-1 p-4 text-text-primary font-mono text-xs sm:text-sm leading-5 whitespace-pre-wrap break-words overflow-x-hidden">
                           {selectedFile.content}
                         </pre>
                       </div>
