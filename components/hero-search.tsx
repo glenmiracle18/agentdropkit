@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
+import { useSearchState } from "./search-state-provider";
 
 // Custom hook for debouncing
 function useDebounce<T>(value: T, delay: number): T {
@@ -23,6 +24,7 @@ function useDebounce<T>(value: T, delay: number): T {
 export default function HeroSearch() {
     const router = useRouter();
     const searchParams = useSearchParams();
+    const { startSearchTransition } = useSearchState();
     const [searchQuery, setSearchQuery] = useState(searchParams.get("search") || "");
 
     // Debounce the search query with 500ms delay
@@ -31,7 +33,7 @@ export default function HeroSearch() {
     // Effect to trigger search when debounced value changes
     useEffect(() => {
         const currentSearch = searchParams.get("search");
-        
+
         // Only update if the debounced value is different from current URL param
         if (currentSearch !== debouncedSearchQuery) {
             const params = new URLSearchParams(searchParams);
@@ -40,7 +42,9 @@ export default function HeroSearch() {
             } else {
                 params.delete("search");
             }
-            router.push(`?${params.toString()}`);
+            startSearchTransition(() => {
+                router.push(`?${params.toString()}`);
+            });
         }
     }, [debouncedSearchQuery, router]);
 
@@ -53,7 +57,9 @@ export default function HeroSearch() {
         } else {
             params.delete("search");
         }
-        router.push(`?${params.toString()}`);
+        startSearchTransition(() => {
+            router.push(`?${params.toString()}`);
+        });
     };
 
     return (

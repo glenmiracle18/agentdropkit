@@ -32,10 +32,13 @@ export default function SkillCard({ listing, index }: SkillCardProps) {
     }
   };
 
+  const staggerDelay = `${Math.min(index, 5) * 0.06}s`;
+
   return (
     <Link
       href={`/${encodeURIComponent(listing.authorHandle)}/${listing.slug}`}
-      className="group flex flex-col p-5 sm:p-6 bg-bg-card border-2 border-border hover:-translate-y-1 hover:-translate-x-1 hover:shadow-[4px_4px_0px_0px_var(--color-text-primary)] transition-all duration-200 h-full"
+      className="group flex flex-col p-5 sm:p-6 bg-bg-card border-2 border-border hover:-translate-y-1 hover:-translate-x-1 hover:shadow-[4px_4px_0px_0px_var(--color-text-primary)] transition-all duration-200 h-full animate-stagger [animation-fill-mode:both]"
+      style={{ "--stagger-delay": staggerDelay } as React.CSSProperties}
     >
       <div className="flex justify-between items-start mb-4 sm:mb-5">
         <div className="w-full">

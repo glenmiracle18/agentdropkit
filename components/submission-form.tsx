@@ -381,6 +381,7 @@ export default function SubmissionForm({ user }: SubmissionFormProps) {
             analysis.license && analysis.license !== "NOASSERTION"
               ? analysis.license
               : prev.license,
+          compatibleAgents: availableAgents,
         }));
 
         sileo.dismiss(loadingToast);

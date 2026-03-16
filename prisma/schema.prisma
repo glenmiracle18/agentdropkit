@@ -111,11 +111,13 @@ model Listing {
   isVisible          Boolean     @default(true)
   language           String?
   npmDependencies    String[]    @default([])
+  rankScore          Float       @default(0)
   skillDependencies  String[]    @default([])
   version            String      @default("1.0.0")
   skill              Skill?
   votes              Vote[]
 
+  @@index([rankScore(sort: Desc)])
   @@map("listings")
 }
 

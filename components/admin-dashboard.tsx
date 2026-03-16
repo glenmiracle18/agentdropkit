@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import Link from "next/link";
 import { sileo } from "sileo";
 import SkillsManagement from "./skills-management";
 import { useAdminSubmissions, useAdminSubmissionAction } from "@/lib/queries/admin";
@@ -233,8 +234,26 @@ export default function AdminDashboard({ data }: AdminDashboardProps) {
           </div>
         </div>
 
-        {/* Actions */}
+        {/* Quick Actions */}
         <div className="mt-6 bg-bg-surface border-2 border-dashed border-border p-6">
+          <div className="flex items-center justify-between gap-4">
+            <div className="min-w-0">
+              <h3 className="text-base font-mono font-bold text-text-primary uppercase tracking-widest">Bulk Import Skills</h3>
+              <p className="text-sm text-text-secondary mt-1">
+                Paste GitHub repo URLs to detect, review, and import multiple skills at once — no submission queue.
+              </p>
+            </div>
+            <Link
+              href="/admin/import"
+              className="flex-shrink-0 px-4 py-2 bg-text-primary text-bg-base text-sm font-mono font-bold uppercase tracking-widest hover:bg-text-muted transition-colors"
+            >
+              Open Importer →
+            </Link>
+          </div>
+        </div>
+
+        {/* GitHub Stars Sync */}
+        <div className="mt-4 bg-bg-surface border-2 border-dashed border-border p-6">
           <div className="flex items-center justify-between gap-4">
             <div className="min-w-0">
               <h3 className="text-base font-mono font-bold text-text-primary uppercase tracking-widest">GitHub Stars Sync</h3>

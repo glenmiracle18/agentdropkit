@@ -1,7 +1,11 @@
+"use client";
+
+import { useState } from "react";
 import Link from "next/link";
-import SubmitHeaderIcon from "@/components/submit-header-icon";
 import { IconFolderSend } from "@/public/assets/arcade-icons";
 import type { Submission } from "@prisma/client";
+
+const INITIAL_VISIBLE = 5;
 
 const statusConfig: Record<string, { color: string; bg: string; border: string; label: string }> = {
     pending: {
@@ -35,9 +39,14 @@ interface SubmissionsListProps {
 }
 
 export default function SubmissionsList({ submissions }: SubmissionsListProps) {
+    const [showAll, setShowAll] = useState(false);
+
     if (submissions.length === 0) {
         return null;
     }
+
+    const visible = showAll ? submissions : submissions.slice(0, INITIAL_VISIBLE);
+    const hiddenCount = submissions.length - INITIAL_VISIBLE;
 
     return (
         <div className="space-y-12">
@@ -61,140 +70,40 @@ export default function SubmissionsList({ submissions }: SubmissionsListProps) {
                 </Link>
             </div>
 
-            <div className="space-y-8">
-                {submissions.map((submission) => {
+            <div className="space-y-3">
+                {visible.map((submission) => {
                     const status = statusConfig[submission.status] ?? statusConfig.pending;
 
                     return (
-                        <div key={submission.id} className="bg-bg-surface border border-border border-dashed p-8 space-y-8">
-                            {/* Header with name and status */}
-                            <div className="flex items-start justify-between gap-4">
-                                <div className="min-w-0 flex-1">
-                                    <h3 className="text-2xl font-bold text-text-primary font-mono mb-2 truncate">
-                                        {submission.name}
-                                    </h3>
-                                    <p className="text-text-secondary truncate" title={submission.description}>
-                                        {submission.description}
-                                    </p>
-                                </div>
-                                <div className={`inline-flex items-center px-4 py-2 border ${status.bg} ${status.border} shrink-0`}>
-                                    <span className={`font-medium ${status.color} whitespace-nowrap`}>
-                                        {status.label}
-                                    </span>
-                                </div>
+                        <div key={submission.id} className="bg-bg-surface border border-border border-dashed px-6 py-4 flex items-center justify-between gap-4">
+                            <div className="min-w-0 flex-1">
+                                <h3 className="text-base font-bold text-text-primary font-mono truncate">
+                                    {submission.name}
+                                </h3>
+                                <p className="text-sm text-text-secondary mt-0.5 line-clamp-1" title={submission.description}>
+                                    {submission.description}
+                                </p>
                             </div>
-
-                            {/* Submission Details */}
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 bg-bg-deep  p-6 border border-border border-dashed">
-                                <div>
-                                    <h4 className="text-sm font-medium text-text-primary mb-2">Type</h4>
-                                    <p className="text-text-secondary capitalize">{submission.type}</p>
-                                </div>
-
-                                <div>
-                                    <h4 className="text-sm font-semibold text-text-primary mb-2">Category</h4>
-                                    <p className="text-text-secondary capitalize">
-                                        {submission.category.replace("-", " ")}
-                                    </p>
-                                </div>
-
-                                <div>
-                                    <h4 className="text-sm font-semibold text-text-primary mb-2">Repository</h4>
-                                    <a
-                                        href={submission.repoUrl}
-                                        target="_blank"
-                                        rel="noopener noreferrer"
-                                        className="text-accent hover:text-accent/80 break-all"
-                                    >
-                                        {submission.repoUrl}
-                                    </a>
-                                </div>
-
-                                {submission.installCommand && (
-                                    <div>
-                                        <h4 className="text-sm font-semibold text-text-primary mb-2">Install Command</h4>
-                                        <code className="text-text-secondary bg-bg-base px-2 py-1 rounded text-sm font-mono block overflow-x-auto">
-                                            {submission.installCommand}
-                                        </code>
-                                    </div>
-                                )}
-
-                                <div>
-                                    <h4 className="text-sm font-semibold text-text-primary mb-2">Submitted</h4>
-                                    <p className="text-text-secondary">
-                                        {new Date(submission.createdAt).toLocaleDateString()}
-                                    </p>
-                                </div>
-                            </div>
-
-                            {/* Tags */}
-                            {submission.tags && submission.tags.length > 0 && (
-                                <div>
-                                    <h4 className="text-sm font-medium text-text-primary mb-2">Tags</h4>
-                                    <div className="flex flex-wrap gap-2">
-                                        {submission.tags.map((tag: string, index: number) => (
-                                            <span
-                                                key={index}
-                                                className="px-2 py-1 text-xs bg-bg-card text-text-dim rounded-sm"
-                                            >
-                                                {tag}
-                                            </span>
-                                        ))}
-                                    </div>
-                                </div>
-                            )}
-
-                            {/* Review Notes */}
-                            {submission.reviewNotes && (
-                                <div>
-                                    <h4 className="text-sm font-medium text-text-primary mb-2">Review Notes</h4>
-                                    <div className="bg-bg-deep border border-border rounded-sm p-4">
-                                        <p className="text-text-secondary whitespace-pre-wrap">
-                                            {submission.reviewNotes}
-                                        </p>
-                                    </div>
-                                </div>
-                            )}
-
-                            {/* Status Actions / Next Steps */}
-                            <div className="pt-6">
-                                {submission.status === "pending" && (
-                                    <p className="text-text-dim text-sm text-center">
-                                        Review in progress. You'll receive an email notification once complete.
-                                    </p>
-                                )}
-
-                                {/* {submission.status === "approved" && (
-                                    <div className="flex justify-center">
-                                        <Link
-                                            href={`/${submission.authorHandle}/${submission.slug}`}
-                                            className="inline-flex items-center px-4 py-2 bg-accent text-bg-deep font-medium rounded-sm hover:bg-accent/90 transition-colors"
-                                        >
-                                            View Published Listing
-                                        </Link>
-                                    </div>
-                                )} */}
-
-                                {submission.status === "rejected" && (
-                                    <div className="flex flex-col items-center gap-3">
-                                        <p className="text-red-400/80 text-sm">
-                                            Please see the review notes above for detailed feedback.
-                                        </p>
-                                    </div>
-                                )}
-
-                                {submission.status === "changes_requested" && (
-                                    <div className="flex flex-col items-center gap-3">
-                                        <p className="text-orange-400/80 text-sm text-center">
-                                            Please address the requested changes in your repository. Our team will re-review once complete.
-                                        </p>
-                                    </div>
-                                )}
+                            <div className={`inline-flex items-center px-3 py-1.5 border ${status.bg} ${status.border} shrink-0`}>
+                                <span className={`text-xs font-medium ${status.color} whitespace-nowrap`}>
+                                    {status.label}
+                                </span>
                             </div>
                         </div>
                     );
                 })}
             </div>
+
+            {hiddenCount > 0 && (
+                <div className="flex justify-center">
+                    <button
+                        onClick={() => setShowAll((v) => !v)}
+                        className="px-6 py-2 border border-border border-dashed text-sm font-mono text-text-secondary hover:text-text-primary hover:border-text-primary transition-colors"
+                    >
+                        {showAll ? "Show Less" : `View ${hiddenCount} More`}
+                    </button>
+                </div>
+            )}
         </div>
     );
 }

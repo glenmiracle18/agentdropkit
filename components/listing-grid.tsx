@@ -3,7 +3,7 @@ import { auth } from '@/lib/auth';
 import { headers } from 'next/headers';
 import type { Prisma } from '@prisma/client';
 import SkillCard from './skill-card';
-import Link from 'next/link';
+import PaginationControls from './pagination-controls';
 
 const PAGE_SIZE = 12;
 
@@ -204,59 +204,20 @@ export default async function ListingGrid({ searchParams }: ListingGridProps) {
 
       {/* Pagination */}
       {totalPages > 1 && (
-        <div className="flex items-center justify-center gap-1 pt-4 font-mono text-xs font-bold uppercase tracking-widest select-none">
-          {/* Prev */}
-          {hasPrev ? (
-            <Link
-              href={pageUrl(params, currentPage - 1)}
-              className="px-3 py-2 border-2 border-border text-text-primary hover:bg-bg-card transition-colors"
-            >
-              ← Prev
-            </Link>
-          ) : (
-            <span className="px-3 py-2 border-2 border-border text-text-muted opacity-30 cursor-not-allowed">
-              ← Prev
-            </span>
+        <PaginationControls
+          currentPage={currentPage}
+          totalPages={totalPages}
+          pageNumbers={pageNumbers}
+          hasPrev={hasPrev}
+          hasNext={hasNext}
+          prevUrl={pageUrl(params, currentPage - 1)}
+          nextUrl={pageUrl(params, currentPage + 1)}
+          pageUrls={Object.fromEntries(
+            pageNumbers
+              .filter((p): p is number => p !== '…')
+              .map((p) => [p, pageUrl(params, p)])
           )}
-
-          {/* Page numbers */}
-          {pageNumbers.map((p, i) =>
-            p === '…' ? (
-              <span key={`ellipsis-${i}`} className="px-2 py-2 text-text-muted">
-                …
-              </span>
-            ) : p === currentPage ? (
-              <span
-                key={p}
-                className="px-3 py-2 border-2 border-text-primary bg-text-primary text-bg-base"
-              >
-                {p}
-              </span>
-            ) : (
-              <Link
-                key={p}
-                href={pageUrl(params, p)}
-                className="px-3 py-2 border-2 border-border text-text-muted hover:text-text-primary hover:bg-bg-card transition-colors"
-              >
-                {p}
-              </Link>
-            )
-          )}
-
-          {/* Next */}
-          {hasNext ? (
-            <Link
-              href={pageUrl(params, currentPage + 1)}
-              className="px-3 py-2 border-2 border-border text-text-primary hover:bg-bg-card transition-colors"
-            >
-              Next →
-            </Link>
-          ) : (
-            <span className="px-3 py-2 border-2 border-border text-text-muted opacity-30 cursor-not-allowed">
-              Next →
-            </span>
-          )}
-        </div>
+        />
       )}
     </div>
   );

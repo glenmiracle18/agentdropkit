@@ -27,9 +27,11 @@ export default function SkillDetailClient({ skill }: SkillDetailClientProps) {
   const [copied, setCopied] = useState(false);
   const [copiedFile, setCopiedFile] = useState(false);
   const [selectedFile, setSelectedFile] = useState<SkillFileData | null>(
-    skill.files?.find((f: SkillFileData) => f.name.toLowerCase() === "skill.md") ??
-    skill.files?.[0] ??
-    null,
+    skill.files?.find(
+      (f: SkillFileData) => f.name.toLowerCase() === "skill.md",
+    ) ??
+      skill.files?.[0] ??
+      null,
   );
   const [contentKey, setContentKey] = useState(0);
   const [installScope, setInstallScope] = useState<"global" | "project">(
@@ -210,7 +212,7 @@ export default function SkillDetailClient({ skill }: SkillDetailClientProps) {
               animationDelay: "120ms",
             }}
           >
-            {skill.overview}
+            {skill.overview ? skill.overview : skill.description}
           </p>
 
           {/* ── 01 — Install Command ─────────────────────────────── */}
@@ -460,7 +462,9 @@ export default function SkillDetailClient({ skill }: SkillDetailClientProps) {
                     files={skill.files}
                     selectedPath={selectedFile?.path}
                     onFileSelect={(f) => {
-                      const match = skill.files.find((sf: SkillFileData) => sf.path === f.path);
+                      const match = skill.files.find(
+                        (sf: SkillFileData) => sf.path === f.path,
+                      );
                       if (!match || selectedFile?.path === match.path) return;
                       setSelectedFile(match);
                       setContentKey((k) => k + 1);
@@ -559,7 +563,9 @@ export default function SkillDetailClient({ skill }: SkillDetailClientProps) {
 
                       {/* Status bar */}
                       <div className="shrink-0 border-t border-border/40 px-4 py-1.5 flex items-center gap-3 text-xs text-text-muted font-mono bg-bg-base/60 select-none">
-                        <span className="truncate">{selectedFile.path || selectedFile.name}</span>
+                        <span className="truncate">
+                          {selectedFile.path || selectedFile.name}
+                        </span>
                         <span className="opacity-30 shrink-0">·</span>
                         <span className="tabular-nums shrink-0">
                           {selectedFileLines.length} lines
