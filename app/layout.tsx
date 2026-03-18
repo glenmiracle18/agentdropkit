@@ -5,6 +5,7 @@ import SiteFooter from "@/components/site-footer";
 import { ThemeProvider } from "@/components/theme-provider";
 import { ToastProvider } from "@/components/toast-provider";
 import QueryProvider from "@/components/query-provider";
+import { Analytics } from "@vercel/analytics/next";
 
 export const metadata: Metadata = {
   title: "AgentDropkit - Prebuilt Claude Skills Directory",
@@ -20,6 +21,7 @@ export default function RootLayout({
   return (
     <html lang="en" suppressHydrationWarning>
       <head>
+        <Analytics />
         <link rel="preconnect" href="https://fonts.googleapis.com" />
         <link
           rel="preconnect"
